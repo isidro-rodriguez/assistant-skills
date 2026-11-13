@@ -1,0 +1,181 @@
+/*
+ * typeset-pdf — base stylesheet (WeasyPrint)
+ * Implements the body-text rules from Butterick's Practical Typography:
+ *   point size 10–12 pt · line spacing 120–145 % · 45–90 characters per line
+ *   no Times New Roman / Arial · kerning on · hyphenation with justification
+ *   paragraph space OR first-line indent, never both · ≤ 3 heading levels
+ * See references/practical-typography.md for the full rule list.
+ *
+ * Page size and margins are injected by scripts/build_pdf.py (--paper);
+ * the values below are the A4 defaults.
+ */
+
+@page {
+  size: A4;
+  /* Side margins sized for ~65 chars/line at 11 pt Charter.
+     Bottom ≈ 6 mm larger than top so the block looks optically centred. */
+  margin: 25mm 43mm 31mm 43mm;
+
+  @bottom-center {
+    content: counter(page);
+    font-family: var(--body-font);
+    font-size: 9pt;
+    color: #444;
+  }
+}
+
+@page :first {
+  @bottom-center { content: none; }
+}
+
+:root {
+  /* Charis SIL (OFL, derived from Charter) is bundled in assets/fonts and
+     registered by build_pdf.py, so the default never falls back to a system font. */
+  --body-font: "Charis SIL", serif;
+  --mono-font: "Triplicate OT", "IBM Plex Mono", "Source Code Pro",
+    "DejaVu Sans Mono", monospace;
+  --body-size: 11pt;
+  --leading: 1.32;           /* 132 % — middle of 120–145 % */
+  --para-space: 0.6em;       /* ≈ 6.6 pt — inside 4–10 pt */
+}
+
+html {
+  font-family: var(--body-font);
+  font-size: var(--body-size);
+  line-height: var(--leading);
+  color: #111;
+  font-kerning: normal;
+  font-variant-ligatures: common-ligatures;
+  hyphens: auto;
+  hyphenate-character: "-";  /* U+002D: bundled subset has no U+2010 */
+}
+
+body { margin: 0; }
+
+/* ---------- Body text ---------- */
+
+p {
+  margin: 0 0 var(--para-space);
+  text-align: justify;
+  text-indent: 0;            /* space between paragraphs, so no indent */
+  orphans: 2;
+  widows: 2;
+}
+
+/* Alternative style: first-line indents instead of space (add class="indent" on <body>). */
+body.indent p { margin-bottom: 0; }
+body.indent p + p { text-indent: 1.5em; }   /* 16.5 pt ≈ 1.5× point size */
+
+strong, b { font-weight: bold; font-style: normal; }
+em, i { font-style: italic; font-weight: normal; }
+strong em, em strong { font-weight: bold; font-style: normal; } /* never bold + italic */
+
+a { color: inherit; text-decoration: none; }   /* never underline in print */
+u { text-decoration: none; font-style: italic; }
+
+.caps, abbr {
+  letter-spacing: 0.08em;    /* 5–12 % extra tracking for caps */
+  font-variant-caps: normal;
+}
+.smallcaps {
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.06em;
+}
+
+/* ---------- Headings: ≤ 3 levels, emphasis from space, small size steps ---------- */
+
+h1, h2, h3, h4 {
+  font-weight: bold;
+  font-style: normal;
+  text-align: left;
+  hyphens: manual;
+  break-after: avoid;
+  break-inside: avoid;
+  line-height: 1.2;
+}
+
+h1 {                         /* document title */
+  font-size: 1.5em;
+  margin: 0 0 1.2em;
+  text-align: center;
+}
+h1 + .subtitle, .subtitle {
+  margin: -0.9em 0 1.6em;
+  text-align: center;
+  font-style: italic;
+}
+h2 { font-size: 1.15em; margin: 1.6em 0 0.5em; }
+h3 { font-size: 1.0em;  margin: 1.3em 0 0.4em; }
+h4 { font-size: 1.0em;  margin: 1.1em 0 0.3em; font-weight: normal; font-style: italic; }
+
+/* ---------- Lists, quotes, rules ---------- */
+
+ul, ol { margin: 0 0 var(--para-space); padding-left: 1.4em; }
+li { margin: 0 0 0.2em; text-align: left; }
+li > p { margin-bottom: 0.2em; }
+ul ul, ol ol, ul ol, ol ul { margin-top: 0.2em; }
+
+blockquote {
+  margin: 0 2em var(--para-space);
+  font-size: 0.95em;
+}
+
+hr {
+  border: 0;
+  border-top: 0.5pt solid #888;
+  width: 30%;
+  margin: 1.5em auto;
+}
+
+/* ---------- Tables: light rules, no grid ---------- */
+
+table {
+  border-collapse: collapse;
+  margin: 0.4em 0 1em;
+  width: 100%;
+  font-size: 0.95em;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums lining-nums;
+  break-inside: avoid;
+}
+th, td {
+  padding: 0.3em 0.6em 0.3em 0;
+  text-align: left;
+  vertical-align: top;
+  hyphens: manual;
+}
+thead th {
+  font-weight: bold;
+  border-bottom: 0.75pt solid #111;
+}
+tbody tr:last-child td { border-bottom: 0.5pt solid #111; }
+td.num, th.num { text-align: right; }
+
+/* ---------- Code (only place monospace is allowed) ---------- */
+
+code, pre { font-family: var(--mono-font); font-size: 0.85em; hyphens: none; }
+pre {
+  margin: 0 0 var(--para-space);
+  padding: 0.5em 0.8em;
+  background: #f4f4f2;
+  line-height: 1.3;
+  white-space: pre-wrap;
+  break-inside: avoid;
+}
+
+/* ---------- Figures ---------- */
+
+figure { margin: 1em 0; break-inside: avoid; text-align: center; }
+img { max-width: 100%; }
+figcaption { font-size: 0.9em; font-style: italic; margin-top: 0.4em; }
+
+/* ---------- Footnotes (Markdown footnotes extension) ---------- */
+
+.footnote { font-size: 0.85em; line-height: 1.3; margin-top: 2em; }
+.footnote hr { width: 20%; margin: 0 0 0.8em; }
+sup { line-height: 0; }
+
+/* ---------- Utilities ---------- */
+
+.center { text-align: center; }
+.page-break { break-before: page; }

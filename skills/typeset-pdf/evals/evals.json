@@ -1,0 +1,43 @@
+{
+  "skill_name": "typeset-pdf",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Turn evals/files/sample.md into a nicely typeset A4 PDF.",
+      "files": ["evals/files/sample.md"],
+      "expected_output": "sample.pdf built with build_pdf.py; check_pdf.py exits 0.",
+      "expectations": [
+        "check_pdf.py reports no FAIL",
+        "Body font is Charis SIL (or a user-named professional font), never Times/Arial/DejaVu",
+        "Body size 10–12 pt, leading 120–145 %, measure 45–90 chars",
+        "Straight quotes, -- and ... in the source appear as curly quotes, en dash and ellipsis",
+        "Numeric table columns are right-aligned",
+        "Page 1 image was inspected before delivery"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Write a one-page letter in Spanish to a client confirming the handover date of their flat is 15 December, and give me it as a PDF.",
+      "files": [],
+      "expected_output": "Markdown source in Spanish plus a PDF built with --lang es.",
+      "expectations": [
+        "build_pdf.py called with --lang es",
+        "Double quotes rendered as « »",
+        "Fits on one page; no page number on page 1",
+        "No bold and italic together; no underline; no all-caps lines",
+        "check_pdf.py reports no FAIL"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Make a US-letter PDF handout from these notes with first-line indents instead of paragraph spacing: <three paragraphs of plain text>.",
+      "files": [],
+      "expected_output": "PDF built with --paper letter --indent.",
+      "expectations": [
+        "build_pdf.py called with --paper letter and --indent",
+        "Paragraphs use indents and no extra space between them",
+        "check_pdf.py reports no FAIL"
+      ]
+    }
+  ]
+}
