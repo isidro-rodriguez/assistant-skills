@@ -4,3 +4,4 @@ __pycache__/
 out/
 *.pdf
 !skills/**/assets/**/*.pdf
+node_modules/

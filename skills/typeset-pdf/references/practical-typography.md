@@ -16,14 +16,14 @@ original for the reasoning. Key pages:
 |---|---|---|
 | Point size (print) | 10–12 pt | `--body-size: 11pt`; `build_pdf.py --size` rejects values outside 10–12; `check_pdf.py size` |
 | Line spacing | 120–145 % of the point size | `--leading: 1.32`; `--leading` limited to 1.20–1.45; `check_pdf.py leading` |
-| Line length | 45–90 characters on average, spaces included | Side margins per paper size (A4 43 mm → about 69 characters); `check_pdf.py measure` |
+| Line length | 45–90 characters on average, spaces included | `--measure` (default 75); `build_pdf.py` calibrates the side margins on the document itself; `check_pdf.py measure` |
 | Font | A professional font; never Times New Roman or Arial; avoid system and most free fonts | Bundled Charis SIL (Charter design); `--font` for licensed fonts; `check_pdf.py font` and `fallback` |
 
 ## Page layout
 
 | Rule | Implemented by |
 |---|---|
-| Margins wider than 1″. Smaller type needs wider margins; aim for the character count, not a fixed width | `@page` margins in `build_pdf.py` `PAPERS` |
+| Margins wider than 1″. Smaller type needs wider margins; aim for the character count, not a fixed width | Margins come from the target measure, with a minimum of 1″ (15 mm on A5) |
 | Bottom margin about 0.25″ larger than the top, so the block looks centred | A4 25 mm top and 31 mm bottom; letter 1″ and 1.25″ |
 | If left and right margins differ, make the difference at least 1″ | Symmetric margins by default |
 | Leave a binding gutter for two-sided documents | Not by default. Add `@page :left/:right` margins through `--css` |
@@ -66,3 +66,14 @@ original for the reasoning. Key pages:
 | Ampersands sparingly | Authoring rule |
 | One exclamation point in documents longer than three pages | `check_pdf.py exclaim` |
 | Avoid monospaced fonts except for code | Monospace only in `code` and `pre` |
+
+## Additions beyond the book
+
+These are the maintainer's own choices, not Butterick's rules.
+
+| Choice | Implemented by |
+|---|---|
+| Default measure of 75 characters, inside the 45–90 range | `--measure 75` |
+| Dense tables may leave the text block, up to 15 mm from the paper edge | `mark_wide_tables()` adds `table.wide`; `--wide-tables` |
+| LaTeX math as vector SVG | `renderers.py` with `render_math.cjs` (MathJax 4) |
+| Mermaid flowcharts: orthogonal edges; horizontal for one chain of ≤ 4 nodes, vertical otherwise | `renderers.py` (`flowchart_direction`, ELK layout) |

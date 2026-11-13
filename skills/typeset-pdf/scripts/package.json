@@ -1,0 +1,10 @@
+{
+  "name": "typeset-pdf-renderers",
+  "private": true,
+  "description": "Node renderers for typeset-pdf: LaTeX math (MathJax SVG) and Mermaid diagrams.",
+  "type": "commonjs",
+  "dependencies": {
+    "@mermaid-js/mermaid-cli": "^11.4.0",
+    "mathjax": "^4.1.3"
+  }
+}

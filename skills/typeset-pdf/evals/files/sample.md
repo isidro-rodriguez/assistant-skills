@@ -34,3 +34,40 @@ Stair cores were clear at every weekly inspection. Waste skips were emptied on s
 3. Run a short session on waste segregation with the drylining subcontractor.
 
 The next review is scheduled for the first week of January. Any questions should go to the site manager.
+
+## Risk model
+
+Each hazard is scored as $R = P \times S$, where $P$ is probability and $S$ severity (both 1–5). The residual risk after controls follows
+
+$$
+R_{res} = R \cdot \prod_{i=1}^{n} \left(1 - e_i\right), \qquad 0 \le e_i < 1
+$$
+
+where $e_i$ is the effectiveness of control $i$.
+
+## Incident workflow
+
+```mermaid
+flowchart TD
+  A[Report] --> B[Investigate] --> C[Close]
+```
+
+```mermaid
+graph LR
+  A[Near miss reported] --> B{Serious?}
+  B -->|yes| C[Stop work]
+  B -->|no| D[Log in register]
+  C --> E[Root-cause analysis]
+  E --> F[Corrective action]
+  D --> F
+  F --> G[Verify and close]
+```
+
+## Inspection log
+
+| Date | Area | Inspector | Item | Finding | Severity | Action | Owner | Due | Status |
+|---|---|---|---|---|---:|---|---|---|---|
+| 02/07 | Level 4 | J. Pérez | Guardrails | Missing after delivery | 4 | Reinstate and add to checklist | Site supervisor | 03/07 | Closed |
+| 16/07 | Stair core B | M. Díaz | Housekeeping | Clear | 1 | None | — | — | Closed |
+| 05/08 | Scaffold E | J. Pérez | Inspection tag | Tag out of date | 3 | Re-inspect and re-tag | Scaffold contractor | 06/08 | Closed |
+| 21/08 | Skips | A. Ruiz | Waste segregation | Mixed plasterboard load | 2 | Toolbox talk to drylining crew | Waste lead | 30/08 | Open |

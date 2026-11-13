@@ -6,15 +6,15 @@
  *   paragraph space OR first-line indent, never both · ≤ 3 heading levels
  * See references/practical-typography.md for the full rule list.
  *
- * Page size and margins are injected by scripts/build_pdf.py (--paper);
- * the values below are the A4 defaults.
+ * Page size and side margins are injected by scripts/build_pdf.py, which
+ * calibrates the text width on the real document to --measure (default 75
+ * characters per line). The values below are only a fallback.
  */
 
 @page {
   size: A4;
-  /* Side margins sized for ~65 chars/line at 11 pt Charter.
-     Bottom ≈ 6 mm larger than top so the block looks optically centred. */
-  margin: 25mm 43mm 31mm 43mm;
+  /* Bottom ≈ 6 mm larger than top so the block looks optically centred. */
+  margin: 25mm 36mm 31mm 36mm;
 
   @bottom-center {
     content: counter(page);
@@ -151,6 +151,12 @@ thead th {
 tbody tr:last-child td { border-bottom: 0.5pt solid #111; }
 td.num, th.num { text-align: right; }
 
+/* Dense tables: build_pdf.py adds class="wide" and sets width/negative margins
+   so the table spreads into the side margins, centred on the page. */
+table.wide { break-inside: auto; }
+table.wide thead { display: table-header-group; }   /* repeat header on new page */
+table.wide tr { break-inside: avoid; }
+
 /* ---------- Code (only place monospace is allowed) ---------- */
 
 code, pre { font-family: var(--mono-font); font-size: 0.85em; hyphens: none; }
@@ -168,6 +174,18 @@ pre {
 figure { margin: 1em 0; break-inside: avoid; text-align: center; }
 img { max-width: 100%; }
 figcaption { font-size: 0.9em; font-style: italic; margin-top: 0.4em; }
+
+/* ---------- Math (MathJax SVG) and diagrams (Mermaid SVG) ---------- */
+
+img.math { display: inline; }
+.math-display {
+  margin: 0.6em 0 0.9em;
+  text-align: center;
+  break-inside: avoid;
+}
+.math-display img.math { display: inline-block; }
+figure.diagram { margin: 1em 0 1.2em; }
+figure.diagram img { max-width: 100%; height: auto; }
 
 /* ---------- Footnotes (Markdown footnotes extension) ---------- */
 

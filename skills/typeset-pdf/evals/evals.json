@@ -4,15 +4,19 @@
     {
       "id": 1,
       "prompt": "Turn evals/files/sample.md into a nicely typeset A4 PDF.",
-      "files": ["evals/files/sample.md"],
+      "files": [
+        "evals/files/sample.md"
+      ],
       "expected_output": "sample.pdf built with build_pdf.py; check_pdf.py exits 0.",
       "expectations": [
         "check_pdf.py reports no FAIL",
         "Body font is Charis SIL (or a user-named professional font), never Times/Arial/DejaVu",
-        "Body size 10–12 pt, leading 120–145 %, measure 45–90 chars",
+        "Body size 11 pt, leading 120–145 %, measure 73–77 chars",
         "Straight quotes, -- and ... in the source appear as curly quotes, en dash and ellipsis",
-        "Numeric table columns are right-aligned",
-        "Page 1 image was inspected before delivery"
+        "Numeric table columns are right-aligned; the 10-column inspection log spans into the margins, the 4-column table does not",
+        "Inline and display formulas are rendered, with no raw LaTeX in the text",
+        "The 3-node chain diagram is horizontal; the branching diagram is vertical with orthogonal edges",
+        "Page images were inspected before delivery"
       ]
     },
     {
@@ -36,6 +40,17 @@
       "expectations": [
         "build_pdf.py called with --paper letter and --indent",
         "Paragraphs use indents and no extra space between them",
+        "check_pdf.py reports no FAIL"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Make a PDF explaining the Pythagorean theorem with the formula a^2 + b^2 = c^2 displayed, and a flowchart of: measure sides → square them → add → take square root.",
+      "files": [],
+      "expected_output": "PDF with a display formula and a horizontal 4-node flowchart.",
+      "expectations": [
+        "Display formula rendered as SVG",
+        "Flowchart is a single chain of 4 nodes, so it renders horizontally (LR)",
         "check_pdf.py reports no FAIL"
       ]
     }

@@ -83,8 +83,8 @@ def analyse(path: str) -> dict:
 
     results = []
 
-    def add(check, status, value, rule):
-        results.append({"check": check, "status": status, "value": value, "rule": rule})
+    def add(check, status, value, rule, raw=None):
+        results.append({"check": check, "status": status, "value": value, "rule": rule, "raw": raw})
 
     add("font", "FAIL" if BAD_FONTS.search(body_font) else "PASS", body_font,
         "No Times New Roman/Arial or fallback fonts")
@@ -93,7 +93,7 @@ def analyse(path: str) -> dict:
         "No glyphs falling back to system fonts")
     add("size","PASS" if 10 <= body_size <= 12 else "FAIL", f"{body_size} pt", "10–12 pt")
     add("leading", "PASS" if 1.18 <= leading <= 1.47 else "FAIL", f"{leading:.0%}", "120–145 %")
-    add("measure", "PASS" if 45 <= measure <= 90 else "FAIL", f"{measure:.0f} chars", "45–90 chars/line")
+    add("measure", "PASS" if 45 <= measure <= 90 else "FAIL", f"{measure:.0f} chars", "45–90 chars/line", measure)
 
     straight = len(re.findall(r"[\"']", body_text))
     add("quotes", "WARN" if straight else "PASS", straight, "Curly quotes, not straight")

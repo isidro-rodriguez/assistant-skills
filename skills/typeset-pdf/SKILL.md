@@ -1,10 +1,10 @@
 ---
 name: typeset-pdf
-description: Produce a well-typeset PDF (report, memo, letter, handout, article) from Markdown or HTML, following Matthew Butterick's Practical Typography rules — 10–12 pt body, 120–145 % line spacing, 45–90 characters per line, good font, curly quotes, real dashes — and verify the result automatically. Use when the user asks to create, generate, export, typeset or "make a nice PDF" of a document, or to convert Markdown/HTML/text into a print-ready PDF. Not for filling, merging or editing existing PDFs.
+description: Produce a well-typeset PDF (report, memo, letter, handout, article) from Markdown or HTML, following Matthew Butterick's Practical Typography rules — 10–12 pt body, 120–145 % line spacing, 75 characters per line, good font, curly quotes, real dashes — with LaTeX formulas, Mermaid flowcharts and wide tables, and verify the result automatically. Use when the user asks to create, generate, export, typeset or "make a nice PDF" of a document, or to convert Markdown/HTML/text into a print-ready PDF. Not for filling, merging or editing existing PDFs.
 license: MIT
-compatibility: Python 3.9+ with weasyprint, markdown, pdfplumber (pip install weasyprint markdown pdfplumber). Optional pdftoppm (poppler-utils) for the visual check. Works in any agent that can run shell commands.
+compatibility: Python 3.9+ with weasyprint, markdown, pdfplumber. For LaTeX math and Mermaid diagrams, Node.js 18+ plus `npm install` in scripts/ and Chrome/Chromium (mermaid-cli). Optional pdftoppm (poppler-utils) for the visual check. Works in any agent that can run shell commands.
 metadata:
-  version: "0.1.0"
+  version: "0.2.0"
   author: isidro-rodriguez
   source: https://practicaltypography.com
 ---
@@ -31,15 +31,21 @@ Ask only if the content itself is missing. Everything else has a default.
 
 1. **Install dependencies** if needed:
    `pip install weasyprint markdown pdfplumber` (add `--break-system-packages` on managed Pythons).
+   Only if the document has math or diagrams, run `npm install` in `scripts/` once.
+   Mermaid uses an installed Chrome/Chromium; set `PUPPETEER_EXECUTABLE_PATH` if it isn't found.
 2. **Write the source as Markdown** (`<name>.md`). Follow the authoring rules
    below; they cover what CSS can't fix.
 3. **Build:**
    ```bash
    python scripts/build_pdf.py <name>.md -o <name>.pdf --lang <lang> --paper <A4|letter|A5>
    ```
-   Options: `--size 10–12`, `--leading 1.20–1.45`, `--font "Family"`,
-   `--css extra.css`, `--indent`, `--title`, `--author`, `--no-page-numbers`.
-   The script refuses out-of-range size or leading.
+   Options: `--measure 45–90` (default 75), `--size 10–12`, `--leading 1.20–1.45`,
+   `--wide-tables auto|all|none`, `--font "Family"`, `--css extra.css`, `--indent`,
+   `--title`, `--author`, `--no-page-numbers`. The script refuses out-of-range values.
+   It calibrates the side margins on the real document until full lines average
+   `--measure` characters; the point size never changes. On A5 the margins hit
+   their 15 mm minimum first, so the line comes out slightly shorter, and the
+   script says so.
 4. **Measure:**
    ```bash
    python scripts/check_pdf.py <name>.pdf
@@ -66,13 +72,28 @@ Ask only if the content itself is missing. Everything else has a default.
 - **Caps:** all caps only for less than one line. Wrap acronym runs in `<span class="caps">` to get letterspacing.
 - **Centered text:** title and subtitle only (`<p class="subtitle">…</p>`).
 - **Tables:** keep them simple. Right-align numeric columns (`---:` in Markdown).
+  A dense table (seven or more columns, or one whose natural width is greater
+  than the line) widens automatically into the margins, up to 15 mm from the
+  paper edge. Body text keeps its measure.
+- **Math:** LaTeX inside `$…$` or `\(…\)` for inline formulas, and `$$…$$` or
+  `\[…\]` for display formulas (amsmath is available). Write `\$` for a literal
+  dollar sign. A LaTeX error stops the build and names the formula.
+- **Diagrams:** put flowcharts in fenced ```` ```mermaid ```` blocks. Edges are
+  routed orthogonally (ELK layout). The direction is set automatically, so
+  don't fight it: **horizontal (LR)** when the diagram is a single chain of at
+  most 4 nodes, **vertical (TD)** in every other case (branches, joins, loops,
+  subgraphs, 5+ nodes). Add `%% direction: keep` to opt out. Other Mermaid
+  diagram types (sequence, Gantt…) render as written. Keep labels short:
+  diagrams print at natural size (labels ≈ 10.5 pt) and shrink only if wider
+  than the text block.
 - **Lists:** use them for genuine series, not to break up prose.
 
 ## Output
 
 - `<name>.pdf`: A4 by default, body in Charis SIL 11 pt at 132 % line spacing,
-  about 65–72 characters per line, justified with hyphenation, page numbers
-  from page 2, and title and author metadata set.
+  75 ± 2 characters per line, justified with hyphenation, page numbers from
+  page 2, and title and author metadata set. Formulas and diagrams are vector
+  SVG, and dense tables span the page.
 - `<name>.md`: the source, kept for rebuilds.
 - A one-line report to the user with the `check_pdf.py` result (size, leading, measure).
 
@@ -81,6 +102,7 @@ Ask only if the content itself is missing. Everything else has a default.
 - [ ] `check_pdf.py` exits 0 (no `FAIL`): body 10–12 pt, line spacing 120–145 %, 45–90 characters per line, no Times New Roman, Arial or fallback body font.
 - [ ] Every `WARN` is resolved or explained (straight quotes, `--`, `...`, double spaces, fallback glyphs, too many exclamation points).
 - [ ] Page images reviewed: no orphaned headings, no table overflow, no text running into the margins.
+- [ ] Every formula is rendered (no raw LaTeX visible) and every diagram follows the direction rule (single chain of ≤ 4 nodes horizontal, otherwise vertical).
 - [ ] Language passed with `--lang` matches the text, so hyphenation and quotes are correct.
 - [ ] No bold and italic together, no underlining, no more than three heading levels.
 
