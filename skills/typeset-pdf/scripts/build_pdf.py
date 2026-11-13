@@ -13,6 +13,8 @@ Also:
   * Line length is calibrated on the real document to --measure characters per
     line (default 75) by adjusting the side margins; the point size never changes.
   * Dense tables (too wide for the text block) widen into the margins.
+  * --doc report adds a cover (from YAML front matter), a table of contents,
+    headings numbered 1 / 1.1 / 1.1.1, roman front matter and body from page 1.
   * LaTeX math ($…$, $$…$$, \\(…\\), \\[…\\]) and ```mermaid diagrams are
     rendered to SVG (needs Node.js and `npm install` in this folder).
 """
@@ -30,6 +32,7 @@ ASSETS = HERE.parent / "assets"
 sys.path.insert(0, str(HERE))
 
 import renderers  # noqa: E402
+import report  # noqa: E402
 
 # Paper → (CSS size, page width mm, top mm, bottom mm, minimum side margin mm).
 # Bottom is ~6 mm larger than top so the text block looks optically centred.
@@ -125,6 +128,8 @@ def build_css(args, geo: dict) -> str:
     if args.no_page_numbers:
         overrides.append("@page { @bottom-center { content: none; } }")
     css += "\n/* --- build overrides --- */\n" + "\n".join(overrides) + "\n"
+    if args.doc == "report":
+        css += "\n/* --- report.css --- */\n" + (ASSETS / "report.css").read_text(encoding="utf-8")
     for extra in args.css or []:
         css += f"\n/* --- {extra} --- */\n" + Path(extra).read_text(encoding="utf-8")
     return css
@@ -187,6 +192,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("input", help=".md or .html source")
     ap.add_argument("-o", "--output", required=True, help="output .pdf path")
+    ap.add_argument("--doc", default="note", choices=["note", "report"],
+                    help="note: plain document (default); report: cover, contents, numbered headings")
     ap.add_argument("--lang", default="en", help="BCP-47 language (drives hyphenation and quotes). Default: en")
     ap.add_argument("--paper", default="A4", choices=["A4", "a4", "letter", "LETTER", "A5", "a5"])
     ap.add_argument("--size", type=float, help="body point size, 10–12 (default 11; 10 for A5)")
@@ -220,6 +227,12 @@ def main() -> int:
 
     src = Path(args.input)
     text = src.read_text(encoding="utf-8")
+    meta = {}
+    if src.suffix.lower() in {".md", ".markdown"}:
+        try:
+            meta, text = report.split_front_matter(text)
+        except ValueError as e:
+            sys.exit(str(e))
 
     # Math and diagrams are pulled out before Markdown sees them.
     text, maths, diagrams = renderers.extract(text)
@@ -238,14 +251,19 @@ def main() -> int:
     body = renderers.substitute(body, maths_html, diagrams_html)
     body = mark_wide_tables(body, args.measure, args.wide_tables)
 
-    title = args.title or first_heading(body) or src.stem
+    if args.doc == "report":
+        body, title = report.build(body, meta, args.lang, args.title)
+        title = args.title or title
+    else:
+        title = args.title or meta.get("title") or first_heading(body) or src.stem
+    author = args.author or meta.get("author", "")
     template = (ASSETS / "template.html").read_text(encoding="utf-8")
 
     def assemble(geo):
         return template.format(
             lang=html.escape(args.lang),
             title=html.escape(title),
-            author=html.escape(args.author),
+            author=html.escape(author),
             css=build_css(args, geo),
             body_class="indent" if args.indent else "",
             content=body,
@@ -271,9 +289,10 @@ def main() -> int:
     out.write_bytes(pdf)
 
     got = measured_chars(pdf)
+    got_txt = f"~{got:.0f}" if got else "n/a (too little text to measure)"
     note = " (side margins at their minimum; use a larger paper or smaller --measure)" if geo["clamped"] else ""
     print(f"Wrote {out} — text block {geo['text_mm']:.0f} mm, side margins {geo['side']:.1f} mm, "
-          f"~{got:.0f} chars/line (target {args.measure}){note}")
+          f"{got_txt} chars/line (target {args.measure}){note}")
     return 0
 
 

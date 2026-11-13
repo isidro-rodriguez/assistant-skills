@@ -1,0 +1,73 @@
+/*
+ * typeset-pdf — report layout (--doc report), loaded after base.css.
+ * Cover (no number) → front matter (roman: i, ii…) → body (arabic from 1).
+ * Headings numbered 1 / 1.1 / 1.1.1 (Practical Typography: tiered numbers).
+ */
+
+/* ---------- Pages ---------- */
+
+@page cover {
+  @top-right { content: none; }
+  @bottom-center { content: none; }
+}
+@page front {
+  @top-right { content: none; }
+  @bottom-center { content: counter(page, lower-roman); }
+}
+@page main {
+  @top-right {
+    content: string(doctitle);
+    font-family: var(--body-font);
+    font-size: 9pt;
+    font-style: italic;
+    color: #444;
+  }
+  @bottom-center { content: counter(page); }
+}
+@page :nth(1 of main) { counter-reset: page 1; }
+
+.cover { page: cover; }
+.front { page: front; break-before: page; }
+.main  { page: main;  break-before: page; }
+
+/* ---------- Cover ---------- */
+
+.cover { text-align: left; }
+.cover-logo { display: block; max-height: 22mm; max-width: 60mm; margin-bottom: 8mm; }
+.cover-org { margin: 0 0 30mm; font-size: 1em; }
+h1.cover-title {
+  string-set: doctitle content();
+  font-size: 2.2em;
+  line-height: 1.15;
+  text-align: left;
+  margin: 0 0 0.4em;
+  hyphens: manual;
+}
+.cover-subtitle { font-size: 1.25em; font-style: italic; margin: 0; text-align: left; }
+/* Author, date and version sit at the foot of the cover page. */
+.cover-details { position: absolute; bottom: 0; left: 0; }
+.cover-details p { margin: 0 0 0.2em; text-align: left; }
+.cover-author { font-weight: bold; }
+
+/* ---------- Table of contents ---------- */
+
+.toc h2.toc-title { margin-top: 0; }
+.toc ol { list-style: none; padding: 0; margin: 0; }
+.toc li { margin: 0; text-align: left; }
+.toc li.toc-l1 { margin-top: 0.55em; font-weight: bold; }
+.toc li.toc-l2 { margin-left: 2.2em; font-weight: normal; }
+.toc a { display: block; }
+.toc a::after {
+  content: leader(" ") target-counter(attr(href), page);
+  font-weight: normal;
+}
+.toc .toc-num { display: inline-block; width: 2.2em; }
+.toc li.toc-l2 .toc-num { width: 2.6em; }
+
+/* ---------- Numbered headings (hanging numbers) ---------- */
+
+.main h2, .main h3, .main h4 { position: relative; }
+.secnum { display: inline-block; min-width: 2.2em; }
+.main h3 .secnum { min-width: 2.6em; }
+.main h4 .secnum { min-width: 3.0em; }
+.main h4 { font-style: normal; font-weight: bold; }   /* level 3 of the hierarchy */

@@ -12,7 +12,7 @@ that read `SKILL.md` (Codex, Gemini CLI, Cursor, etc.).
 
 | Skill | What it does |
 |---|---|
-| [`typeset-pdf`](skills/typeset-pdf/SKILL.md) | Turns Markdown/HTML into a well-typeset PDF following Butterick's *Practical Typography*: 75 characters per line, LaTeX math, Mermaid flowcharts, wide tables, and an automatic quality check. |
+| [`typeset-pdf`](skills/typeset-pdf/SKILL.md) | Turns Markdown/HTML into a well-typeset PDF following Butterick's *Practical Typography*, as a casual document or a formal report (cover, contents, numbered headings): 75 characters per line, LaTeX math, Mermaid flowcharts, wide tables, and an automatic quality check. |
 
 ## Layout
 

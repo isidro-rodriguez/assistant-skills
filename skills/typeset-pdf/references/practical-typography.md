@@ -42,7 +42,7 @@ original for the reasoning. Key pages:
 
 | Rule | Implemented by |
 |---|---|
-| No more than three levels; two is better | Authoring rule; CSS styles h1–h3, with h4 as a fallback |
+| No more than three levels; two is better | Authoring rule; reports number `##`/`###`/`####` as three levels |
 | Emphasise with space above and below first | Generous top and bottom margins |
 | Bold rather than italic; smallest visible size increase | h2 is 1.15em bold; h3 is the same size and bold |
 | Keep with the next paragraph; no hyphenation in headings | `break-after: avoid; hyphens: manual` |
@@ -77,3 +77,4 @@ These are the maintainer's own choices, not Butterick's rules.
 | Dense tables may leave the text block, up to 15 mm from the paper edge | `mark_wide_tables()` adds `table.wide`; `--wide-tables` |
 | LaTeX math as vector SVG | `renderers.py` with `render_math.cjs` (MathJax 4) |
 | Mermaid flowcharts: orthogonal edges; horizontal for one chain of ≤ 4 nodes, vertical otherwise | `renderers.py` (`flowchart_direction`, ELK layout) |
+| Reports: cover, contents with page numbers, headings numbered 1 / 1.1 / 1.1.1 (Butterick's *hierarchical headings*: tiered numbers, no roman numerals or letters) | `--doc report`: `report.py`, `assets/report.css`; `check_pdf.py --report` |

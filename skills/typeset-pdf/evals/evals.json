@@ -53,6 +53,31 @@
         "Flowchart is a single chain of 4 nodes, so it renders horizontally (LR)",
         "check_pdf.py reports no FAIL"
       ]
+    },
+    {
+      "id": 5,
+      "prompt": "Turn evals/files/report.md into a formal report PDF with cover, table of contents and numbered sections.",
+      "files": [
+        "evals/files/report.md"
+      ],
+      "expected_output": "report.pdf built with --doc report; check_pdf.py --report exits 0.",
+      "expectations": [
+        "Page 1 is the cover with organisation, title, subtitle, author, date and version; no page number",
+        "Page 2 is the contents page numbered ii, listing ## and ### entries with correct page numbers",
+        "Body starts at page 1; headings numbered 1, 1.1, 1.1.1; running head shows the title",
+        "check_pdf.py --report: no FAIL (cover, toc, numbering pass)"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Hazme un informe en PDF sobre la inspección de la obra (escribe tú unos apartados de ejemplo), con portada a nombre de Isidro Rodríguez, versión 0.1.",
+      "files": [],
+      "expected_output": "Spanish report built with --doc report --lang es.",
+      "expectations": [
+        "Front matter has author and version \"0.1\"",
+        "Contents title is 'Índice'; cover shows 'Versión 0.1'; quotes are « »",
+        "check_pdf.py --report: no FAIL"
+      ]
     }
   ]
 }

@@ -14,6 +14,11 @@ Checks (FAIL = must fix, WARN = review):
   ellipsis    "..." instead of …                                                 WARN
   spaces      double spaces                                                      WARN
   exclaim     more than one "!" in a document longer than 3 pages                WARN
+With --report also:
+  cover       page 1 has no page number                                          FAIL
+  toc         table of contents present; every entry points to the page where
+              its numbered heading actually is                                   FAIL
+  numbering   headings numbered 1 / 1.1 / 1.1.1 in sequence, ≤ 3 levels           FAIL
 Exit code 1 if any FAIL.
 """
 from __future__ import annotations
@@ -63,10 +68,15 @@ def analyse(path: str) -> dict:
 
     body = [l for l in lines if abs(l[4] - body_size) < 0.3]
 
-    # Measure: lines that fill ≥ 90 % of the widest body line (i.e. justified/full lines).
+    # Measure: lines that fill ≥ 90 % of the widest body line (i.e. justified/full lines),
+    # ignoring sparse lines such as table-of-contents entries with leaders.
     widths = [l[3] - l[2] for l in body]
     max_w = max(widths) if widths else 0
     full = [l for l in body if (l[3] - l[2]) >= 0.9 * max_w]
+    if full:
+        dens = sorted(len(l[5]) / (l[3] - l[2]) for l in full)
+        med = dens[len(dens) // 2]
+        full = [l for l in full if len(l[5]) / (l[3] - l[2]) >= 0.75 * med]
     measure = st.mean(len(l[5]) for l in full) if full else 0
 
     # Leading: distance between consecutive body lines on the same page and left edge.
@@ -76,7 +86,8 @@ def analyse(path: str) -> dict:
             d = b[1] - a[1]
             if 0 < d < 2 * body_size:
                 gaps.append(d)
-    leading = (st.median(gaps) / body_size) if gaps and body_size else 0
+    # Most common gap (robust against paragraph and list spacing).
+    leading = (Counter(round(g, 1) for g in gaps).most_common(1)[0][0] / body_size) if gaps and body_size else 0
 
     text = "\n".join(full_text)
     body_text = "\n".join(l[5] for l in body)
@@ -92,8 +103,15 @@ def analyse(path: str) -> dict:
     add("fallback", "WARN" if stray else "PASS", ", ".join(stray) or "none",
         "No glyphs falling back to system fonts")
     add("size","PASS" if 10 <= body_size <= 12 else "FAIL", f"{body_size} pt", "10–12 pt")
-    add("leading", "PASS" if 1.18 <= leading <= 1.47 else "FAIL", f"{leading:.0%}", "120–145 %")
-    add("measure", "PASS" if 45 <= measure <= 90 else "FAIL", f"{measure:.0f} chars", "45–90 chars/line", measure)
+    if len(gaps) < 5:
+        add("leading", "WARN", "n/a (too little text)", "120–145 %")
+    else:
+        add("leading", "PASS" if 1.18 <= leading <= 1.47 else "FAIL", f"{leading:.0%}", "120–145 %")
+    if len(full) < 3:
+        add("measure", "WARN", "n/a (too little text)", "45–90 chars/line", None)
+    else:
+        add("measure", "PASS" if 45 <= measure <= 90 else "FAIL", f"{measure:.0f} chars",
+            "45–90 chars/line", measure)
 
     straight = len(re.findall(r"[\"']", body_text))
     add("quotes", "WARN" if straight else "PASS", straight, "Curly quotes, not straight")
@@ -107,16 +125,93 @@ def analyse(path: str) -> dict:
     add("exclaim", "WARN" if n_pages > 3 and excl > 1 else "PASS", excl,
         "One exclamation point per long document")
 
-    return {"file": path, "pages": n_pages, "fonts": dict(fonts.most_common(6)), "results": results}
+    return {"file": path, "pages": n_pages, "fonts": dict(fonts.most_common(6)), "results": results,
+            "_lines": lines, "_body_size": body_size}
+
+
+ROMAN = re.compile(r"^[ivxlcdm]+$")
+NUM_HEAD = re.compile(r"^(\d+(?:\.\d+){0,2})\s+(\S.*)$")
+TOC_ENTRY = re.compile(r"^(\d+(?:\.\d+)?)\s+(.+?)\s+(\d+)$")
+
+
+def report_checks(path: str, rep: dict) -> None:
+    import pdfplumber
+
+    labels, page_lines = [], []
+    with pdfplumber.open(path) as pdf:
+        for page in pdf.pages:
+            lines = page.extract_text_lines()
+            page_lines.append(lines)
+            foot = [l for l in lines if l["top"] > page.height * 0.88]
+            labels.append(foot[-1]["text"].strip() if foot else "")
+    results = rep["results"]
+
+    def add(check, ok, value, rule):
+        results.append({"check": check, "status": "PASS" if ok else "FAIL", "value": value,
+                        "rule": rule, "raw": None})
+
+    add("cover", labels[0] == "" or not (labels[0].isdigit() or ROMAN.match(labels[0])),
+        labels[0] or "no number", "Cover page carries no page number")
+
+    # Pages of the body: footer label is an arabic number.
+    by_label = {lab: i for i, lab in enumerate(labels) if lab.isdigit()}
+    front = [i for i, lab in enumerate(labels) if ROMAN.match(lab)]
+
+    entries = []
+    for i in front:
+        for l in page_lines[i]:
+            m = TOC_ENTRY.match(l["text"].strip())
+            if m:
+                entries.append(m.groups())
+    if not entries:
+        add("toc", False, "not found", "Table of contents with page numbers")
+    else:
+        bad = []
+        for num, text, pg in entries:
+            idx = by_label.get(pg)
+            words = " ".join(text.split()[:3])
+            hit = idx is not None and any(
+                l["text"].strip().startswith(num + " ") and words in " ".join(l["text"].split())
+                for l in page_lines[idx])
+            if not hit:
+                bad.append(f"{num}→p.{pg}")
+        add("toc", not bad, f"{len(entries)} entries" + (f", wrong: {', '.join(bad[:5])}" if bad else ""),
+            "Every contents entry points to its heading's page")
+
+    # Numbering: bold numbered headings in the body, in sequence.
+    nums = []
+    with pdfplumber.open(path) as pdf:
+        for i in sorted(by_label.values()):
+            for l in pdf.pages[i].extract_text_lines(return_chars=True):
+                m = NUM_HEAD.match(l["text"].strip())
+                if m and all("Bold" in c["fontname"] for c in l["chars"][: len(m.group(1))]):
+                    nums.append(m.group(1))
+    expected, seq_ok = [0, 0, 0], True
+    for n in nums:
+        parts = [int(x) for x in n.split(".")]
+        lvl = len(parts) - 1
+        expected[lvl] += 1
+        for j in range(lvl + 1, 3):
+            expected[j] = 0
+        if parts != expected[: lvl + 1]:
+            seq_ok = False
+            break
+    add("numbering", bool(nums) and seq_ok, f"{len(nums)} headings" + ("" if seq_ok else f", break at {n}"),
+        "Headings numbered 1 / 1.1 / 1.1.1 in sequence")
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("pdf")
     ap.add_argument("--json", action="store_true", help="machine-readable output")
+    ap.add_argument("--report", action="store_true", help="also check cover, contents and numbering")
     args = ap.parse_args()
 
     report = analyse(args.pdf)
+    if args.report:
+        report_checks(args.pdf, report)
+    report.pop("_lines", None)
+    report.pop("_body_size", None)
     if args.json:
         print(json.dumps(report, indent=2, ensure_ascii=False))
     else:
