@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: report-from-markdown
+expected_outcome: |
+  Report PDF: unnumbered cover with the front-matter data, roman-numbered contents page with correct page refs, body starting at page 1 with headings numbered 1 / 1.1 / 1.1.1.
+context:
+  scaffold_script: place-files.sh

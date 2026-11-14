@@ -27,6 +27,63 @@ def parse(path: Path):
     return yaml.safe_load(m.group(1)) or {}, m.group(2)
 
 
+CASE_NAME_RE = re.compile(r"^[a-z][a-z0-9-]*$")
+RESERVED = {"results", "mocks", "node_modules", "files", "true", "false", "null"}
+
+
+def check_evals(evals: Path) -> list[str]:
+    """Test cases: evals/<case>/ folders (skill-creator / `claude plugin eval`
+    layout) and/or the older evals/evals.json. At least one case is required."""
+    errors, n_cases = [], 0
+    if not evals.is_dir():
+        return ["evals/ missing (add at least one test case)"]
+    for case in sorted(p for p in evals.iterdir() if p.is_dir()):
+        if case.name in RESERVED:
+            continue
+        n_cases += 1
+        where = f"evals/{case.name}"
+        if not CASE_NAME_RE.match(case.name):
+            errors.append(f"{where}: case name must be lowercase-with-hyphens, starting with a letter")
+        prompt = case / "prompt.md"
+        if not prompt.exists():
+            errors.append(f"{where}: prompt.md missing")
+        else:
+            m = re.match(r"^---\n(.*?)\n---\n(.*)$", prompt.read_text(encoding="utf-8"), re.S)
+            if not m or not m.group(2).strip():
+                errors.append(f"{where}: prompt.md needs a settings block and a prompt")
+        cy = case / "case.yaml"
+        if not cy.exists():
+            errors.append(f"{where}: case.yaml missing")
+        else:
+            try:
+                data = yaml.safe_load(cy.read_text(encoding="utf-8")) or {}
+                if not isinstance(data.get("schema_version"), str):
+                    errors.append(f"{where}: case.yaml schema_version must be a quoted string")
+                if data.get("name") != case.name:
+                    errors.append(f"{where}: case.yaml name must equal the folder name")
+                script = (data.get("context") or {}).get("scaffold_script")
+                if script and not (case / script).exists():
+                    errors.append(f"{where}: scaffold script {script} not found")
+            except yaml.YAMLError as e:
+                errors.append(f"{where}: case.yaml invalid: {e}")
+        graders = sorted((case / "graders").glob("*.md")) if (case / "graders").is_dir() else []
+        if not graders:
+            errors.append(f"{where}: graders/ needs at least one .md file")
+        for g in graders:
+            if not g.read_text(encoding="utf-8").startswith("---\n"):
+                errors.append(f"{where}/graders/{g.name}: missing frontmatter block")
+    legacy = evals / "evals.json"
+    if legacy.exists():
+        try:
+            data = json.loads(legacy.read_text(encoding="utf-8"))
+            n_cases += len(data.get("evals", []))
+        except json.JSONDecodeError as e:
+            errors.append(f"evals/evals.json invalid JSON: {e}")
+    if n_cases == 0:
+        errors.append("no test cases in evals/")
+    return errors
+
+
 def check(skill_dir: Path) -> list[str]:
     errors = []
     md = skill_dir / "SKILL.md"
@@ -67,19 +124,10 @@ def check(skill_dir: Path) -> list[str]:
         if section not in body:
             errors.append(f"missing section '{section}'")
 
-    evals = skill_dir / "evals" / "evals.json"
-    if not evals.exists():
-        errors.append("evals/evals.json missing")
-    else:
-        try:
-            data = json.loads(evals.read_text(encoding="utf-8"))
-            if not data.get("evals"):
-                errors.append("evals/evals.json has no cases")
-        except json.JSONDecodeError as e:
-            errors.append(f"evals/evals.json invalid JSON: {e}")
+    errors += check_evals(skill_dir / "evals")
 
     # Relative file references in the body must exist.
-    for ref in re.findall(r"`((?:scripts|references|assets|evals)/[^`\s]+)`", body):
+    for ref in re.findall(r"`((?:scripts|references|assets|evals)/[^`\s*<]+)`", body):
         if not (skill_dir / ref).exists():
             errors.append(f"referenced file not found: {ref}")
     return errors

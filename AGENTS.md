@@ -25,7 +25,28 @@ A library of portable agent skills. Each skill must make a recurring task
   exit code on failure. Declare dependencies in `compatibility`.
 - **No vendor lock-in:** don't rely on tools only one assistant has unless the
   skill says so in `compatibility`.
-- **Evals:** each skill ships `evals/evals.json` with at least one case.
+- **Evals:** each skill ships at least one test case as a folder
+  `evals/<case-name>/` with `prompt.md`, `case.yaml` and `graders/` (one
+  verifiable statement per file, worded about the result, not the process).
+  This is the skill-creator layout, also run by `claude plugin eval`. Input
+  files go in the case's `files/` with a `place-files.sh`. Copy
+  `templates/skill-template/evals/example-case/`.
+
+## Creating or improving a skill
+
+Use the **skill-creator** skill when the agent has it (Claude: `/skill-creator`):
+
+1. Capture intent and edge cases; draft `SKILL.md` from the template.
+2. Write 2–3 realistic test prompts as case folders.
+3. Run each case with and without the skill (or with the previous version),
+   in independent sub-agents, into `../<skill>-workspace/iteration-N/`
+   (outside the repo).
+4. Grade with scripts where possible, aggregate the benchmark, and review the
+   outputs in the eval viewer before changing anything.
+5. Improve the skill and repeat. Explain the *why* behind rules rather than
+   piling on MUSTs.
+6. Finally, optimise the `description` for triggering (20 should/shouldn't
+   trigger queries).
 
 ## Before committing
 

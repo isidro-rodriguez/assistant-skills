@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: report-spanish-from-scratch
+expected_outcome: |
+  Spanish report PDF with cover (author Isidro Rodríguez, version 0.1), an 'Índice' page, numbered sections and Spanish typography.

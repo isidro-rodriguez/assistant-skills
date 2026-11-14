@@ -22,7 +22,7 @@ skills/<skill-name>/      one folder per skill
   scripts/                executable helpers
   references/             docs loaded on demand
   assets/                 templates, stylesheets, static files
-  evals/                  test prompts + expectations
+  evals/<case>/           test cases: prompt.md, case.yaml, graders/
 templates/
   skill-template/         starting point for new skills
   AGENTS.template.md      base always-on context to copy into projects
@@ -41,14 +41,17 @@ ln -s "$PWD/skills/typeset-pdf" ~/.claude/skills/typeset-pdf
 New-Item -ItemType SymbolicLink -Path "$HOME\.claude\skills\typeset-pdf" -Target "$PWD\skills\typeset-pdf"
 ```
 
-For claude.ai, zip the skill folder and upload it under Settings → Capabilities → Skills.
+For claude.ai, upload the packaged `.skill` file (see `dist/`) or a zip of the
+skill folder under Settings → Capabilities → Skills.
 
 ## Creating a new skill
 
 1. Copy `templates/skill-template/` to `skills/<new-name>/`.
 2. Fill in every section of `SKILL.md`; delete the folders you don't use.
-3. Add at least one case to `evals/evals.json`.
+3. Write 2–3 test cases as `evals/<case-name>/` folders (see the template's
+   `example-case`).
 4. Run `python scripts/validate_skills.py`.
+5. Test and iterate with the skill-creator workflow described in `AGENTS.md`.
 
 ## Skills vs. always-on context
 

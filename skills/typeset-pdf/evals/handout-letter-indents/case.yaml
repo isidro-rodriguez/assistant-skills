@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: handout-letter-indents
+expected_outcome: |
+  US-letter PDF handout whose paragraphs are separated by first-line indents only.

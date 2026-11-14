@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: note-sample-a4
+expected_outcome: |
+  An A4 PDF of sample.md that follows Practical Typography: good serif font, 10–12 pt body, 120–145 % leading, about 75 characters per line, curly quotes and real dashes, formulas and diagrams rendered, dense table widened.
+context:
+  scaffold_script: place-files.sh
