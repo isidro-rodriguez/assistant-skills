@@ -1,0 +1,22 @@
+[
+  {"query": "tengo estas notas de la visita a obra del martes en un .md (visita-obra-martes.md), pásamelas a un PDF decente para mandárselo al promotor, que no parezca un word de los 90", "should_trigger": true},
+  {"query": "Hazme un informe técnico en PDF sobre el estado de la cubierta del bloque C: portada con mi nombre, índice y apartados numerados. Te paso los datos: 3 fisuras en el peto norte, impermeabilización degradada en un 30 %, sumideros obstruidos.", "should_trigger": true},
+  {"query": "Can you typeset this markdown README as a printable A4 handout? It has a couple of tables and one mermaid flowchart showing the deploy pipeline", "should_trigger": true},
+  {"query": "necesito un pdf con la fórmula del momento flector máximo de una viga biapoyada (M = qL²/8) bien maquetada y una explicación corta para mis alumnos de FP", "should_trigger": true},
+  {"query": "convert meeting-minutes-2026-11-12.md to pdf please, letter size, it's going to the board", "should_trigger": true},
+  {"query": "Write a one-page cover letter for a site manager position at Ferrovial and give it to me as a PDF ready to attach", "should_trigger": true},
+  {"query": "el informe trimestral de PRL lo tengo en markdown con una tabla de 11 columnas de indicadores que no cabe; genera el PDF con portada e índice y que la tabla se vea entera", "should_trigger": true},
+  {"query": "I have an HTML page export of our safety procedure (procedure-ppe.html). Make it into a properly typeset print PDF with page numbers.", "should_trigger": true},
+  {"query": "redacta una circular para los subcontratistas sobre el nuevo horario de descargas y sácamela en PDF", "should_trigger": true},
+  {"query": "turn these lecture notes with LaTeX equations ($\\sigma = F/A$ etc.) into a nice-looking PDF I can print for revision", "should_trigger": true},
+  {"query": "une estos tres PDFs de certificados (cert1.pdf, cert2.pdf, cert3.pdf) en uno solo para subirlo a la plataforma de la licitación", "should_trigger": false},
+  {"query": "rellena el formulario PDF de solicitud de licencia de obra menor del ayuntamiento con estos datos: titular Isidro Rodríguez, dirección C/ La Marina 12", "should_trigger": false},
+  {"query": "extrae las tablas de mediciones de este PDF del proyecto (mediciones-fase2.pdf) a un Excel", "should_trigger": false},
+  {"query": "Make me a Word document (.docx) of the site induction checklist, my boss wants to edit it in Word with track changes", "should_trigger": false},
+  {"query": "hazme una presentación de 10 diapositivas con los resultados de la inspección para la reunión del lunes", "should_trigger": false},
+  {"query": "what's the difference between an en dash and an em dash, and when should I use each in a technical report?", "should_trigger": false},
+  {"query": "comprime este PDF de planos que pesa 85 MB para poder mandarlo por correo", "should_trigger": false},
+  {"query": "dibújame en el chat un diagrama de flujo del proceso de gestión de no conformidades según ISO 9001", "should_trigger": false},
+  {"query": "add a watermark that says BORRADOR diagonally on every page of informe-final.pdf", "should_trigger": false},
+  {"query": "crea una hoja de cálculo para llevar el control de las inspecciones semanales con fecha, zona, inspector y estado", "should_trigger": false}
+]

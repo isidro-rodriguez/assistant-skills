@@ -4,7 +4,7 @@ description: Produce a well-typeset PDF (memo, letter, handout, article, or a fo
 license: MIT
 compatibility: Python 3.9+ with weasyprint, markdown, pdfplumber. For LaTeX math and Mermaid diagrams, Node.js 18+ plus `npm install` in scripts/ and Chrome/Chromium (mermaid-cli). Optional pdftoppm (poppler-utils) for the visual check. Works in any agent that can run shell commands.
 metadata:
-  version: "0.3.0"
+  version: "0.3.1"
   author: isidro-rodriguez
   source: https://practicaltypography.com
 ---
@@ -69,41 +69,66 @@ For reports, read `references/report.md` before writing the source.
    `measure` show `n/a` as a `WARN`, which is fine.
    Every `FAIL` must be fixed (change options or CSS, rebuild). Resolve each
    `WARN` in the source, or tell the user why it stays.
-5. **Look at it:** `pdftoppm -r 80 -png <name>.pdf page` and view page 1, plus
-   any page with a table or figure. Check for headings stranded at the bottom
-   of a page, overflowing tables and awkward breaks.
+5. **Look at it:** `pdftoppm -r 80 -png <name>.pdf page` and view every page
+   (or page 1 plus every page with a table, figure or diagram in long
+   documents). Check for headings stranded at the bottom of a page,
+   overflowing tables and awkward breaks.
+   **Large blank gaps:** a diagram, display formula or table that doesn't fit
+   the space left on a page moves whole to the next one, leaving a gap. This
+   can't be fixed in CSS, so fix it in the source and rebuild. Move the block
+   one or two paragraphs later (or earlier), so the prose fills the gap; the
+   text should still say "the diagram below/above". If moving it would break
+   the argument, simplify the diagram, for example by splitting it in two. A
+   gap of more than about a third of a page is worth fixing; a smaller one
+   isn't.
 6. **Deliver** the PDF. Keep the `.md` source next to it so it can be rebuilt.
 
 ### Authoring rules (apply while writing the Markdown)
 
-- **Headings:** no more than three levels (`#` title, `##`, `###`); two is better.
-  Use sentence case, never all caps, and no bold or italic inside headings.
-- **Emphasis:** bold *or* italic, used sparingly, never both together. Never underline.
-- **Punctuation:** type plain `"` and `'`; the build turns them into curly
-  quotes (« » for `es`/`fr`, „ “ for `de`). Use `--` for an en dash (ranges,
-  2019–2026) and `---` for an em dash (a break in a sentence). Use `...` for an ellipsis.
+The stylesheet fixes most typography on its own. These rules cover what only
+the writer can decide, with the reason for each so you can judge edge cases.
+
+- **Headings:** at most three levels (`#` title, `##`, `###`; `####` only in
+  reports). Each extra level is harder to tell apart in print, and readers stop
+  following the hierarchy. Use sentence case: all caps and title case are
+  slower to read. Don't add bold or italic inside headings, because they are
+  already bold.
+- **Emphasis:** bold *or* italic, sparingly, never both. Emphasis only works
+  by contrast, and every extra mark weakens the others. Never underline,
+  because underlining is a typewriter substitute for italic and cuts through
+  descenders.
+- **Punctuation:** type plain `"`, `'`, `--` (en dash, for ranges such as
+  2019--2026), `---` (em dash, for a break in a sentence) and `...`. The build
+  converts them for `--lang` (« » for Spanish and French, „ “ for German).
+  Typing them plainly keeps the source portable and the conversion consistent.
   Write `©`, `™` and `®` as the real characters.
-- **Spacing:** one space between sentences. Use no blank lines or spaces to
-  create layout; use CSS classes instead (`{: .page-break }` on a block, or HTML).
-- **Exclamation points:** at most one in any document longer than three pages.
-- **Caps:** all caps only for less than one line. Wrap acronym runs in `<span class="caps">` to get letterspacing.
-- **Centered text:** title and subtitle only (`<p class="subtitle">…</p>`).
-- **Tables:** keep them simple. Right-align numeric columns (`---:` in Markdown).
-  A dense table (seven or more columns, or one whose natural width is greater
-  than the line) widens automatically into the margins, up to 15 mm from the
-  paper edge. Body text keeps its measure.
-- **Math:** LaTeX inside `$…$` or `\(…\)` for inline formulas, and `$$…$$` or
-  `\[…\]` for display formulas (amsmath is available). Write `\$` for a literal
-  dollar sign. A LaTeX error stops the build and names the formula.
+- **Spacing:** one space between sentences. Don't use blank lines or spaces
+  for layout: HTML collapses them, so the result is unpredictable. Use
+  `<div class="page-break"></div>` or CSS instead.
+- **Exclamation points and caps:** at most one exclamation point in a long
+  document, and all caps for less than a line. Both read as shouting; a run
+  of caps also loses word shapes. Put acronym runs in `<span class="caps">`
+  to get the letterspacing caps need.
+- **Centred text:** only the title and subtitle (`<p class="subtitle">…</p>`).
+  Ragged left edges make longer text hard to scan.
+- **Tables:** keep them simple and right-align numeric columns (`---:`) so
+  digits line up. A dense table (7+ columns, or naturally wider than the line)
+  widens into the margins automatically, up to 15 mm from the paper edge, so
+  its text stays legible instead of shrinking. Body text keeps its measure.
+- **Math:** LaTeX in `$…$` or `\(…\)` for inline formulas, `$$…$$` or
+  `\[…\]` for display formulas (amsmath available). Write `\$` for a literal
+  dollar. A LaTeX error stops the build and names the formula, so a broken
+  formula never reaches the PDF unnoticed.
 - **Diagrams:** put flowcharts in fenced ```` ```mermaid ```` blocks. Edges are
-  routed orthogonally (ELK layout). The direction is set automatically, so
-  don't fight it: **horizontal (LR)** when the diagram is a single chain of at
-  most 4 nodes, **vertical (TD)** in every other case (branches, joins, loops,
-  subgraphs, 5+ nodes). Add `%% direction: keep` to opt out. Other Mermaid
-  diagram types (sequence, Gantt…) render as written. Keep labels short:
-  diagrams print at natural size (labels ≈ 10.5 pt) and shrink only if wider
-  than the text block.
-- **Lists:** use them for genuine series, not to break up prose.
+  orthogonal (ELK layout), and the build sets the direction so diagrams read
+  the same way across documents: **horizontal (LR)** for a single chain of at
+  most 4 nodes, **vertical (TD)** for anything else (branches, joins, loops,
+  subgraphs, 5+ nodes). Use `%% direction: keep` only if the user asks for a
+  specific direction. Other Mermaid types (sequence, Gantt…) render as
+  written. Keep labels short: diagrams print at natural size (labels ≈ 10.5 pt)
+  and shrink only to fit the text width.
+- **Lists:** only for genuine series. Bulleted fragments in place of prose
+  hide how the ideas connect.
 
 ## Output
 

@@ -41,8 +41,9 @@ ln -s "$PWD/skills/typeset-pdf" ~/.claude/skills/typeset-pdf
 New-Item -ItemType SymbolicLink -Path "$HOME\.claude\skills\typeset-pdf" -Target "$PWD\skills\typeset-pdf"
 ```
 
-For claude.ai, upload the packaged `.skill` file (see `dist/`) or a zip of the
-skill folder under Settings → Capabilities → Skills.
+For claude.ai, upload a packaged `.skill` file under Settings → Capabilities →
+Skills. Build it with skill-creator's `package_skill.py` (it leaves out
+`evals/`, `node_modules/` and caches), or zip the skill folder without those.
 
 ## Creating a new skill
 
