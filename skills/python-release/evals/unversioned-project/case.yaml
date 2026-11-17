@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: unversioned-project
+expected_outcome: |
+  The agent notices the project is not versioned (0.0.0, no CHANGELOG), changes nothing and asks whether to start versioning.
+context:
+  scaffold_script: place-files.sh

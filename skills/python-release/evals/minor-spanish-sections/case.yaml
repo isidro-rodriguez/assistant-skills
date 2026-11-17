@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: minor-spanish-sections
+expected_outcome: |
+  Version 0.3.0 (a feat commit means MINOR) with entries under the Spanish section name the file already uses.
+context:
+  scaffold_script: place-files.sh

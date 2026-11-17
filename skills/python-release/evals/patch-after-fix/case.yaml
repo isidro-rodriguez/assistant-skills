@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: patch-after-fix
+expected_outcome: |
+  Version 0.2.1 with a dated CHANGELOG section describing the rounding fix in Spanish; nothing committed or pushed; the user is asked to confirm the commits.
+context:
+  scaffold_script: place-files.sh

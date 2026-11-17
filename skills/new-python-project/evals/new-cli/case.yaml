@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: new-cli
+expected_outcome: |
+  A mediciones-obra project from acodo-template: package mediciones_obra, version 0.1.0, AGENTS.md with the shared block, CLAUDE.md importing it, README describing the CLI, quality gate passing, nothing committed.

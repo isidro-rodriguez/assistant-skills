@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: migrate-claude-md
+expected_outcome: |
+  AGENTS.md with the verbatim shared block plus Project rules that keep the repo-specific rules (gettext, Decimal money, generated fixtures, direct-commit policy, tag publishing); CLAUDE.md = @AGENTS.md; report lists conflicts.
+context:
+  scaffold_script: place-files.sh
