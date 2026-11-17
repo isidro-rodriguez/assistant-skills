@@ -52,8 +52,9 @@ Run the script from the skill folder: `python scripts/release.py --project <dir>
      new feature is worse than an extra minor number.
    - Pre-releases (`1.2.0-beta.3`) are fine as explicit versions. `bump patch`
      on a pre-release produces the final release (`1.2.0`).
-3. **Write the CHANGELOG entries** under `## [Unreleased]`, creating that
-   heading at the top if it is missing:
+3. **Write the CHANGELOG entries** under the pending heading, `## [Unreleased]`
+   or its Spanish form `## [Sin publicar]`. Use whichever the file or the project's
+   rules already use, and create it at the top if it's missing:
    - Group them under `### Added`, `Changed`, `Fixed`, `Removed`, `Deprecated`
      and `Security`. If the file already uses the Spanish names (`Añadido`,
      `Cambiado`, `Corregido`…), keep them; don't mix languages in one file.

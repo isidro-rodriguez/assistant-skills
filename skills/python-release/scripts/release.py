@@ -39,6 +39,8 @@ SECTIONS = {
     "Added", "Changed", "Deprecated", "Removed", "Fixed", "Security",
     "Añadido", "Cambiado", "Obsoleto", "Eliminado", "Corregido", "Seguridad", "Interno",
 }
+# Keep a Changelog's pending-changes heading, in English or Spanish ("Sin publicar").
+UNRELEASED = ("Unreleased", "Sin publicar")
 CHANGELOG_SKELETON = """# Changelog
 
 Todos los cambios relevantes de `{name}` se documentan en este fichero.
@@ -160,9 +162,9 @@ def changelog_problems(text: str, version: str) -> list[str]:
     seen = []
     for r in rel:
         v = r["version"]
-        if v == "Unreleased":
+        if v in UNRELEASED:
             if r is not rel[0]:
-                probs.append("'## [Unreleased]' must be the first section.")
+                probs.append(f"'## [{v}]' must be the first section.")
             continue
         if not SEMVER.match(v):
             probs.append(f"Release heading [{v}] is not SemVer (X.Y.Z or X.Y.Z-pre).")
@@ -189,16 +191,17 @@ def changelog_problems(text: str, version: str) -> list[str]:
 
 def promote(text: str, new: str, today: str) -> str:
     rel = parse_changelog(text)
-    unrel = next((r for r in rel if r["version"] == "Unreleased"), None)
+    unrel = next((r for r in rel if r["version"] in UNRELEASED), None)
     if any(r["version"] == new for r in rel):
         raise ReleaseError(f"CHANGELOG already has a [{new}] section.")
     if unrel is None or unrel["entries"] == 0:
         raise ReleaseError(
-            "Nothing under '## [Unreleased]'. Write the entries first (Spanish, explain the why), "
-            "grouped under ### Added / Changed / Fixed / Removed…")
+            "Nothing under '## [Unreleased]' (or '## [Sin publicar]'). Write the entries first "
+            "(Spanish, explain the why), grouped under the section names the file already uses.")
+    label = f"## [{unrel['version']}]"
     head = f"## [{new}] - {today}"
-    # Keep an empty [Unreleased] on top for the next cycle.
-    return text[:unrel["start"]] + f"## [Unreleased]\n\n{head}" + text[unrel["start"] + len("## [Unreleased]"):]
+    # Keep an empty pending heading, with the same label, on top for the next cycle.
+    return text[:unrel["start"]] + f"{label}\n\n{head}" + text[unrel["start"] + len(label):]
 
 
 # --------------------------------------------------------------------------
@@ -290,8 +293,9 @@ def cmd_status(root: Path, as_json: bool) -> int:
     cl = root / "CHANGELOG.md"
     if cl.exists():
         rel = parse_changelog(cl.read_text(encoding="utf-8"))
-        un = next((r for r in rel if r["version"] == "Unreleased"), None)
-        info["changelog"] = {"top_release": next((r["version"] for r in rel if r["version"] != "Unreleased"), None),
+        un = next((r for r in rel if r["version"] in UNRELEASED), None)
+        info["changelog"] = {"top_release": next((r["version"] for r in rel if r["version"] not in UNRELEASED), None),
+                             "pending_heading": un["version"] if un else None,
                              "unreleased_entries": un["entries"] if un else None}
     else:
         info["changelog"] = None
