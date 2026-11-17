@@ -1,6 +1,6 @@
 schema_version: "1.1"
 name: new-site-gh-pages
 expected_outcome: |
-  A Zensical site with the canonical layout: favicon set and manifest linked with relative paths, theme colour #2e7d32, self-hosted serif body and sans headings, Spanish API reference, a GitHub Pages workflow; the build has no issues and nothing is committed.
+  A Zensical site with the canonical layout: favicon set and manifest linked with relative paths, theme colour #2e7d32, readable body text by Practical Typography's ranges, Spanish API reference, a GitHub Pages workflow; the build has no issues and nothing is committed.
 context:
   scaffold_script: place-files.sh

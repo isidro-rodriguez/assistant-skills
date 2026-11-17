@@ -1,20 +1,22 @@
 ---
 name: zensical-site
-description: Create, migrate, check and upgrade a Zensical documentation site with one canonical layout — zensical.toml, docs/ with assets (favicon set, self-hosted fonts, stylesheets) and site.webmanifest, docs_templates/ (main.html with favicons, manifest and theme colour; Spanish mkdocstrings templates), optional GitHub Pages workflow — and Practical Typography for the web (serif text, sans headings, 18 px, 140 % leading, ~75 characters per line). Use it when the user wants documentation, a website or GitHub Pages for a project ("añade documentación", "web del proyecto", "monta Zensical"), wants an existing docs/ brought onto the common layout, mentions favicons, webmanifest or docs_templates, or wants to update Zensical or fix a build broken by a Zensical release (Dependabot bump, theme moved, overridden template changed).
+description: Create, migrate, check and upgrade a Zensical documentation site with one canonical layout — zensical.toml, docs/ with assets (favicon set, fonts, stylesheets) and site.webmanifest, docs_templates/ (main.html with favicons, manifest and theme colour; Spanish mkdocstrings templates), optional GitHub Pages workflow — a starting typography and theme, and a browser measurement that holds every site to Practical Typography's readability ranges (15–25 px text, 120–145 % line spacing, 45–90 characters per line), whatever its fonts. Use it when the user wants documentation, a website or GitHub Pages for a project ("añade documentación", "web del proyecto", "monta Zensical"), wants an existing docs/ brought onto the common layout, mentions favicons, webmanifest or docs_templates, or wants to update Zensical or fix a build broken by a Zensical release (Dependabot bump, theme moved, overridden template changed).
 license: MIT
-compatibility: Python 3.11+ (tomllib) and uv. Favicons need Pillow, plus resvg-py for SVG logos, run through `uv run --with pillow --with resvg-py`; they never enter the project's lock. `upgrade` needs network access (uv, PyPI).
+compatibility: Python 3.11+ (tomllib) and uv. Favicons need Pillow, plus resvg-py for SVG logos (`uv run --with pillow --with resvg-py`); `measure` needs Playwright and Chrome, Edge or `playwright install chromium` (`uv run --with playwright`); none of them enter the project's lock. `upgrade` needs network access (uv, PyPI).
 metadata:
-  version: "0.1.0"
+  version: "0.2.0"
   author: isidro-rodriguez
 ---
 
 # Zensical site
 
 Every project's documentation site has the same layout, the same head
-(favicons, manifest, theme colour), the same typography and the same build
-gate, so any repo can be checked against it and upgraded the same way. The
-canonical layout is in `references/layout.md`; the typography and its reasons
-in `references/typography.md`.
+(favicons, manifest, theme colour) and the same build gate, so any repo can be
+checked against it and upgraded the same way. New sites start from a common
+typography and theme; after that the fonts and the look are the project's,
+but every site must stay readable by *Practical Typography*'s measures, which
+`measure` checks in a real browser. The canonical layout is in
+`references/layout.md`; the typography rules in `references/typography.md`.
 
 Works alone (reCocina is not a Python package) or next to `new-python-project`:
 that skill owns `AGENTS.md`'s shared block, this one adds a
@@ -51,20 +53,20 @@ leaves alone.
    It never overwrites existing files (`--force` does) and prints what it wrote.
 3. Add the tools as dev dependencies: `uv add --dev zensical`, plus
    `mkdocstrings-python mkdocs-api-autonav` with `--package`.
-4. Put the project's palette in `docs/assets/stylesheets/<slug>.css`, never in
-   `typography.css`. Fill `nav` and `docs/index.md` with real content.
+4. Put the project's palette in `docs/assets/stylesheets/<slug>.css`. The starting
+   `typography.css` and fonts are the project's from now on: change them there if
+   the project wants another look. Fill `nav` and `docs/index.md` with real content.
 5. Verify (below). On GitHub, remind the user to set **Settings → Pages →
    Source: GitHub Actions** once; that can't be done from the repo.
 
 ### migrate (existing docs/)
 
 1. `python S/scripts/site.py check .` — the list of gaps is the work list.
-2. `python S/scripts/site.py sync .` — copies `typography.css`, the fonts,
-   `es.html.jinja` (with mkdocstrings) and the AGENTS.md block.
+2. `python S/scripts/site.py sync .` — copies `es.html.jinja` (with mkdocstrings)
+   and the AGENTS.md block.
 3. Edit `zensical.toml` by hand, keeping comments and project choices:
-   `custom_dir = "docs_templates"`, `font = false` (delete `font.text`/`font.code`),
-   `typography.css` first in `extra_css`, `favicon = "assets/favicon/favicon-32x32.png"`,
-   `[project.extra] theme_color`. Keep the project's `features`, palette,
+   `custom_dir = "docs_templates"`, `favicon = "assets/favicon/favicon-32x32.png"`,
+   `[project.extra] theme_color`. Keep the project's fonts, `features`, palette,
    extensions and plugins: only the structure is canonical.
 4. Favicons: `git mv` existing ones into `docs/assets/favicon/` with the
    canonical names, then `uv run --with pillow --with resvg-py python
@@ -82,14 +84,27 @@ leaves alone.
    project has steps of its own (atril's screenshots, a `workflow_call`): then
    only align the shared steps. Never add a Pages workflow to a project that
    deploys elsewhere.
-8. Remove what the canonical layout replaced (old favicon copies, Google Fonts
-   settings, duplicated CSS rules now in `typography.css`) and verify.
+8. Build and run `measure` (below). Fix every FAIL in the project's own
+   stylesheet, keeping its fonts: usually `line-height` (the theme uses 160–180 %)
+   and a `max-width` in `ch` on paragraphs, lists, quotes and admonitions, tuned
+   until the measured line length is near 75 characters. Don't copy the starting
+   `typography.css` into an existing site unless the user asks for the common look.
+9. Remove what the canonical layout replaced (old favicon copies) and verify.
 
 ### check
 
-`python S/scripts/site.py check .` — exit 1 on any FAIL. Report FAILs and
-WARNs; INFO lines (customised `main.html` or workflow) are expected in projects
-with their own templates.
+`python S/scripts/site.py check .` — layout only; exit 1 on any FAIL. Report FAILs
+and WARNs; INFO lines (customised `main.html` or workflow) are expected in
+projects with their own templates.
+
+### measure (readability)
+
+After `uv run zensical build`:
+`uv run --with playwright python S/scripts/site.py measure .` opens the home page
+and the largest pages at 1280 and 1920 px wide and measures the body paragraphs
+(median per page): text 15–25 px, line spacing 120–145 %, 45–90 characters per
+line. Exit 1 on any page out of range. It names the body fonts and warns about
+system fonts (Arial, Times New Roman…), but any font passes.
 
 ### upgrade (new Zensical release, failing Dependabot PR)
 
@@ -127,9 +142,9 @@ Then follow the project's commit policy: never commit or push unless it allows i
 1. `uv run zensical build` ends with "No issues found" (with `--strict` where the
    project uses it).
 2. `python S/scripts/site.py check .` reports no FAIL.
-3. `site/index.html` has the favicon links, `site.webmanifest`, the
-   `theme-color` meta and no `fonts.googleapis.com`.
-4. Look at one page (`uv run zensical serve` or a headless screenshot): body in
-   Charis SIL, headings and interface in Source Sans 3, paragraphs about 75
-   characters wide, tables and code at full width.
-5. The project's own quality gate still passes.
+3. `measure` reports no FAIL.
+4. `site/index.html` has the favicon links, `site.webmanifest` and the
+   `theme-color` meta.
+5. Look at one page (`uv run zensical serve` or a headless screenshot): headings
+   clearly distinct from the text, tables and code at full width, nothing clipped.
+6. The project's own quality gate still passes.

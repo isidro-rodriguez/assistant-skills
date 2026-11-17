@@ -1,9 +1,9 @@
 /*
- * Tipografía común de los sitios Zensical (skill `zensical-site`).
+ * Tipografía de arranque de los sitios Zensical (skill `zensical-site`).
  *
- * Copia gestionada: no la edites en el proyecto; los cambios propios van en
- * `assets/stylesheets/<proyecto>.css`, que se carga después y puede pisar
- * cualquier regla. Criterios de Butterick, *Practical Typography*:
+ * Punto de partida: el proyecto puede cambiarla a su gusto mientras siga
+ * dentro de los rangos de Butterick, que comprueba `site.py measure`.
+ * Criterios de *Practical Typography*:
  * cuerpo de 15–25 px, interlineado del 120–145 %, 45–90 caracteres por línea,
  * serif para el texto y sans para los encabezados y la interfaz.
  * Las fuentes se sirven desde el propio sitio (`theme.font = false`): sin
@@ -104,9 +104,9 @@
   --md-code-font: "Source Code Pro";
   /* Texto de lectura. */
   --site-body-font: "Charis SIL", Georgia, serif;
-  /* Longitud de línea del texto corrido: 66ch son unos 75 caracteres de
-     media con Charis SIL (el ancho de «0» supera al de la minúscula media). */
-  --site-measure: 66ch;
+  /* Longitud de línea del texto corrido: 60ch son unos 75 caracteres de
+     media con Charis SIL (el ancho de «0» supera al del carácter medio). */
+  --site-measure: 60ch;
 }
 
 /* ==========================================================================
@@ -125,8 +125,10 @@
 }
 
 /* Las líneas largas cansan: el texto corrido ronda los 75 caracteres.
-   Tablas, código, diagramas e imágenes conservan todo el ancho. */
-.md-typeset > :is(p, ul, ol, dl, blockquote, .admonition, details) {
+   Tablas, código, diagramas e imágenes conservan todo el ancho. También en
+   la referencia de la API (mkdocstrings: .doc-contents). */
+.md-typeset > :is(p, ul, ol, dl, blockquote, .admonition, details),
+.md-typeset .doc-contents > :is(p, ul, ol, dl, blockquote, .admonition, details) {
   max-width: var(--site-measure);
 }
 

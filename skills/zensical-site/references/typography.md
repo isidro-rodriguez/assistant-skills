@@ -1,30 +1,48 @@
-# Web typography (typography.css)
+# Typography
 
 Source: Matthew Butterick, *Practical Typography*,
 <https://practicaltypography.com> — "summary of key rules", "point size",
-"line length", "line spacing", "font recommendations". The same author's rules
-drive `typeset-pdf`, so the site and the PDFs look like one family.
+"line length", "line spacing". The same rules drive `typeset-pdf`.
 
-| Rule (Butterick) | Value in `typography.css` | Note |
+## What every site must meet (`site.py measure`)
+
+| Rule (Butterick) | Range | How it is measured |
 |---|---|---|
-| Body text 15–25 px on the web | `clamp(15px, 0.9rem, 22px)`: 18 px on most screens | the theme defaults to 15 px |
-| Line spacing 120–145 % | `line-height: 1.4` | the theme uses 1.8 |
-| 45–90 characters per line | `max-width: 66ch` on paragraphs, lists, quotes, admonitions | `ch` is the width of "0", wider than the average Charis SIL letter: 66ch ≈ 75 characters, the same measure as `typeset-pdf` |
-| A good font; avoid system and most free fonts | Charis SIL for text (Charter's design, as in the PDFs) | self-hosted, OFL |
-| Sans for headings and interface, serif for text (the user's own rule) | Source Sans 3 (600) for headings, admonition titles, table headers, navigation | through the theme's `--md-text-font` |
-| Code in a monospaced font | Source Code Pro at 0.85 em | through `--md-code-font` |
-| Don't shrink secondary text below the body range | admonitions 0.9 em, tables 0.85 em (≥ 15 px) | the theme sets about 13 px |
-| Bold and italic with restraint; real italics | Charis SIL and Source Sans 3 include true italics | no synthesised styles |
-| Wide content needs room | tables, code blocks, diagrams and images keep the full content width | like `--wide-tables` in `typeset-pdf` |
+| Body text 15–25 px on the web | 15–25 px | computed `font-size` of article paragraphs |
+| Line spacing 120–145 % of the point size | 1.20–1.45 | computed `line-height` ÷ `font-size` |
+| Average line length 45–90 characters | 45–90 | paragraph width ÷ average character width of that paragraph's own text in its own font |
 
-Self-hosting (`theme.font = false` plus `@font-face` rules pointing to
-`docs/assets/fonts/`) also keeps the site working offline and avoids sending
-every visitor's IP address to Google Fonts.
+`measure` serves `site/`, opens the home page and the largest pages at 1280 and
+1920 px wide (the theme enlarges `rem` on wide screens), takes article paragraphs
+of at least 120 characters, and compares the median per page. Any font passes; it
+only warns about system fonts Butterick advises against (Arial, Times New Roman,
+Helvetica, Calibri…).
+
+Typical fixes in an existing site, in the project's stylesheet:
+
+- `line-height`: Zensical's theme uses 1.6 (classic) to 1.8 (modern); set
+  `.md-typeset { line-height: 1.4; }`.
+- line length: put `max-width` in `ch` on `.md-typeset > :is(p, ul, ol, dl,
+  blockquote, .admonition, details)` (and the same under `.md-typeset
+  .doc-contents >` for mkdocstrings API pages) and tune it until `measure` reports about 75
+  characters (`ch` is the width of "0", wider than the average character, so
+  about 60ch gives 75 characters in most fonts). Tables, code and figures keep
+  the full width.
+- size: the theme's default 15 px is at the lower edge; 16–20 px reads better.
+
+## Starting typography (new sites)
+
+`assets/site/docs/assets/stylesheets/typography.css`, which a project may then
+change freely:
+
+| Choice | Value |
+|---|---|
+| Text | Charis SIL (Charter's design, as in the PDFs), 18 px (15–22 px with `clamp`), line height 1.4, 60ch ≈ 75 characters |
+| Headings and interface | Source Sans 3, weight 600 (the user's rule: serif text, sans headings) |
+| Code | Source Code Pro, 0.85 em |
+| Admonitions and tables | 0.9 em and 0.85 em, so they stay at or above 15 px |
+| Fonts | self-hosted (`theme.font = false`, `@font-face` to `docs/assets/fonts/`): no Google Fonts, works offline |
 
 Fonts come from the Fontsource packages (`@fontsource/charis-sil`,
 `@fontsource/source-sans-3`, `@fontsource/source-code-pro`), latin subset, which
-covers Spanish (á, ñ, ü, ¿, ¡, «, »). To update them, replace the files in
-`assets/site/docs/assets/fonts/` and run `site.py sync` in each project.
-
-A project may override any of this in its own stylesheet (it loads after
-`typography.css`), for instance a different body size for a dense reference.
+covers Spanish (á, ñ, ü, ¿, ¡, «, »).

@@ -7,14 +7,20 @@ Subcommands:
                 docs_templates/ (main.html, es.html.jinja with --package) and,
                 with --gh-pages, .github/workflows/docs.yml.
   favicons DIR  Regenerate docs/assets/favicon/ from a logo (SVG or PNG).
-  sync DIR      Refresh the managed copies (typography.css, fonts, es.html.jinja)
-                and the zensical block of AGENTS.md.
+  sync DIR      Refresh the managed copies (es.html.jinja) and the zensical block
+                of AGENTS.md.
   check DIR     Compare DIR with the canonical layout; exit 1 on any FAIL.
+  measure DIR   Measure the built site in a browser against Practical Typography:
+                body text 15-25 px, line spacing 120-145 %, 45-90 characters per
+                line; exit 1 if a page is out of range. Fonts are the project's choice.
   upgrade DIR   Upgrade Zensical in the lock, then diff every template in
                 docs_templates/ against the new theme and build the site.
 
 Favicon generation needs Pillow (and resvg-py for SVG logos); run it as
   uv run --with pillow --with resvg-py python scripts/site.py ...
+measure needs Playwright and a Chromium-based browser (Chrome or Edge installed, or
+`playwright install chromium`):
+  uv run --with playwright python scripts/site.py measure .
 Everything else uses only the standard library (Python 3.11+, for tomllib).
 """
 
@@ -123,11 +129,14 @@ def _png_size(path: Path) -> tuple[int, int] | None:
     return struct.unpack(">II", data[16:24])
 
 
+def _starter_files() -> list[str]:
+    """Typography and fonts that `new` copies once; afterwards they belong to the project."""
+    return [TYPOGRAPHY, *(f"{FONTS}/{p.name}" for p in sorted((SITE / FONTS).iterdir()))]
+
+
 def _managed_files(with_mkdocstrings: bool) -> list[str]:
-    files = [TYPOGRAPHY, *(f"{FONTS}/{p.name}" for p in sorted((SITE / FONTS).iterdir()))]
-    if with_mkdocstrings:
-        files.append(ES_JINJA)
-    return files
+    """Files kept identical to the skill's copy (refreshed by `sync`)."""
+    return [ES_JINJA] if with_mkdocstrings else []
 
 
 def _uses_mkdocstrings(cfg: dict) -> bool:
@@ -230,7 +239,7 @@ def cmd_new(args: argparse.Namespace) -> int:
     _write(root / f"docs/assets/stylesheets/{slug}.css", _render("project.css.tmpl", values),
            args.force, log)
     _copy(SITE / MAIN, root / MAIN, args.force, log)
-    for rel in _managed_files(bool(args.package)):
+    for rel in [*_starter_files(), *_managed_files(bool(args.package))]:
         _copy(SITE / rel, root / rel, args.force, log)
     if args.gh_pages:
         _copy(SITE / WORKFLOW, root / WORKFLOW, args.force, log)
@@ -314,15 +323,11 @@ def _check_toml(cfg: dict, root: Path, r: Report) -> None:
                "(favicons, manifest) is ignored.")
     if theme.get("language") != "es":
         r.fail('[project.theme] language is not "es".')
-    if theme.get("font", None) is not False:
-        r.fail("[project.theme] font is not false: the theme loads Google Fonts and its "
-               "inline font variables override typography.css.")
     css = project.get("extra_css", [])
     tcss = TYPOGRAPHY.removeprefix("docs/")
-    if tcss not in css:
-        r.fail(f"extra_css does not load {tcss}.")
-    elif css[0] != tcss:
-        r.warn(f"{tcss} is not first in extra_css: the project stylesheet should load after it.")
+    if tcss in css and theme.get("font", None) is not False:
+        r.warn(f"{tcss} is loaded but [project.theme] font is not false: the theme's "
+               "Google Fonts variables override its font choices.")
     for rel in [*css, *project.get("extra_javascript", [])]:
         if isinstance(rel, str) and not rel.startswith(("http:", "https:")) \
                 and not (docs / rel).exists():
@@ -363,19 +368,12 @@ def _check_files(cfg: dict, root: Path, r: Report) -> None:
             r.fail(f"missing favicon: {f.relative_to(root)} (run `favicons`).")
         elif size and _png_size(f) != (size, size):
             r.fail(f"{f.relative_to(root)} is not a {size}x{size} PNG.")
-    missing: list[str] = []
     for rel in _managed_files(_uses_mkdocstrings(cfg)):
         f = root / rel
         if not f.exists():
-            missing.append(rel)
+            r.fail(f"missing managed file {rel} (run `sync`).")
         elif not filecmp.cmp(SITE / rel, f, shallow=False):
-            r.fail(f"{rel} differs from the managed copy (run `sync`; project styling "
-                   "belongs in the project stylesheet).")
-    fonts = [m for m in missing if m.startswith(FONTS)]
-    if fonts:
-        r.fail(f"missing {len(fonts)} managed font files in {FONTS}/ (run `sync`).")
-    for rel in (m for m in missing if not m.startswith(FONTS)):
-        r.fail(f"missing managed file {rel} (run `sync`).")
+            r.fail(f"{rel} differs from the managed copy (run `sync`).")
     man = root / "docs/site.webmanifest"
     if not man.exists():
         r.fail("missing docs/site.webmanifest.")
@@ -458,6 +456,146 @@ def cmd_check(args: argparse.Namespace) -> int:
     _check_files(cfg, root, r)
     _check_templates(root, r)
     _check_repo(cfg, root, r)
+    return r.finish()
+
+
+# ---------------------------------------------------------------------------
+# measure
+# ---------------------------------------------------------------------------
+
+# Practical Typography, "summary of key rules": body text 15-25 px on the web, line
+# spacing 120-145 % of the point size, 45-90 characters per line on average.
+SIZE_PX = (15.0, 25.0)
+LEADING = (1.20, 1.45)
+MEASURE = (45.0, 90.0)
+VIEWPORTS = ((1280, 900), (1920, 1080))
+# Measured on the home page when it has no long paragraph of its own.
+PROBE = ("La tipografía de una página se juzga por su texto corrido: el tamaño de la letra, "
+         "el interlineado y la longitud de las líneas deciden si se lee con comodidad. "
+         "Este párrafo de prueba solo existe durante la medición y nunca se publica.")
+# Fonts Butterick singles out as overused defaults: a warning, never a failure.
+SYSTEM_FONTS = {"times new roman", "times", "arial", "helvetica", "calibri", "cambria",
+                "verdana", "segoe ui", "-apple-system", "system-ui", "roboto"}
+MEASURE_JS = """
+(probe) => {
+  const article = document.querySelector("article") || document.querySelector(".md-content");
+  if (!article) return [];
+  const out = [];
+  let paras = [...article.querySelectorAll("p")].filter(
+    (p) => p.textContent.replace(/\\s+/g, " ").trim().length >= 120);
+  if (!paras.length && probe) {
+    // Short pages still have a typography: measure a probe paragraph set like body text.
+    const p = document.createElement("p");
+    p.textContent = probe;
+    article.appendChild(p);
+    paras = [p];
+  }
+  for (const p of paras) {
+    if (p.closest("table, pre, nav, figure, .admonition-title, footer")) continue;
+    const text = p.textContent.replace(/\\s+/g, " ").trim();
+    const cs = getComputedStyle(p);
+    const size = parseFloat(cs.fontSize);
+    const leading = cs.lineHeight === "normal" ? NaN : parseFloat(cs.lineHeight);
+    const width = p.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    // Average character width of this very text, set on one line in the same font.
+    const probe = document.createElement("span");
+    probe.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap";
+    probe.textContent = text;
+    p.appendChild(probe);
+    const perChar = probe.getBoundingClientRect().width / text.length;
+    probe.remove();
+    out.push({size, leading: leading / size, chars: width / perChar,
+              family: cs.fontFamily.split(",")[0].replace(/["']/g, "").trim()});
+  }
+  return out;
+}
+"""
+
+
+def _pages(site: Path, limit: int) -> list[str]:
+    """Relative URLs of the home page and the largest pages (the most text to measure)."""
+    files = [p for p in site.rglob("index.html")
+             if "assets" not in p.parts and "python" not in p.parts]
+    files.sort(key=lambda p: (p.parent != site, -p.stat().st_size))
+    rels = [p.relative_to(site).parent.as_posix() for p in files[:limit]]
+    return ["" if r == "." else r + "/" for r in rels]
+
+
+def _median(values: list[float]) -> float:
+    values = sorted(values)
+    return values[len(values) // 2]
+
+
+def cmd_measure(args: argparse.Namespace) -> int:
+    import functools
+    import http.server
+    import threading
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError as err:
+        raise SiteError("measure needs Playwright: run with "
+                        "`uv run --with playwright python scripts/site.py measure .`.") from err
+    root = Path(args.dir).resolve()
+    site = root / _load_toml(root).get("project", {}).get("site_dir", "site")
+    if not (site / "index.html").exists():
+        raise SiteError(f"{site}/index.html not found: build the site first.")
+    class Quiet(http.server.SimpleHTTPRequestHandler):
+        def log_message(self, *args: object) -> None:
+            pass
+
+    handler = functools.partial(Quiet, directory=str(site))
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{server.server_port}/"
+    r = Report()
+    families: set[str] = set()
+    measured = 0
+    with sync_playwright() as pw:
+        browser = None
+        for channel in ("chrome", "msedge", None):
+            try:
+                browser = pw.chromium.launch(channel=channel) if channel else pw.chromium.launch()
+                break
+            except Exception:  # noqa: BLE001 - try the next browser
+                continue
+        if browser is None:
+            raise SiteError("No browser for Playwright: install Chrome or Edge, or run "
+                            "`uv run --with playwright playwright install chromium`.")
+        for width, height in VIEWPORTS:
+            page = browser.new_page(viewport={"width": width, "height": height})
+            for rel in _pages(site, args.pages):
+                page.goto(base + rel, wait_until="load")
+                page.evaluate("document.fonts.ready")
+                rows = page.evaluate(MEASURE_JS, PROBE if rel == "" else None)
+                if not rows:
+                    continue
+                measured += 1
+                size = _median([x["size"] for x in rows])
+                lead = _median([x["leading"] for x in rows])
+                chars = _median([x["chars"] for x in rows])
+                families |= {x["family"] for x in rows}
+                where = f"/{rel} at {width}px"
+                line = f"{where}: {size:.1f} px, line spacing {lead:.0%}, {chars:.0f} characters"
+                problems = []
+                if not SIZE_PX[0] <= size <= SIZE_PX[1]:
+                    problems.append(f"size outside {SIZE_PX[0]:.0f}-{SIZE_PX[1]:.0f} px")
+                if not (LEADING[0] - 0.005) <= lead <= (LEADING[1] + 0.005):
+                    problems.append(f"line spacing outside {LEADING[0]:.0%}-{LEADING[1]:.0%}")
+                if not MEASURE[0] <= chars <= MEASURE[1]:
+                    problems.append(f"line length outside {MEASURE[0]:.0f}-{MEASURE[1]:.0f}")
+                if problems:
+                    r.fail(f"{line} ({'; '.join(problems)}).")
+                else:
+                    r.info(line)
+            page.close()
+        browser.close()
+    server.shutdown()
+    if not measured:
+        r.warn("no page has paragraphs long enough to measure.")
+    for fam in sorted(families):
+        if fam.lower() in SYSTEM_FONTS:
+            r.warn(f"body text in {fam}: Practical Typography advises against system fonts.")
+    r.info(f"body fonts: {', '.join(sorted(families)) or 'none measured'}")
     return r.finish()
 
 
@@ -636,12 +774,15 @@ def main() -> int:
     for name, hlp in (("sync", "refresh managed copies and AGENTS.md block"),
                       ("check", "compare with the canonical layout")):
         sub.add_parser(name, help=hlp).add_argument("dir")
+    m = sub.add_parser("measure", help="check the built site against Practical Typography")
+    m.add_argument("dir")
+    m.add_argument("--pages", type=int, default=12, help="pages to sample (default: 12)")
     u = sub.add_parser("upgrade", help="upgrade Zensical and review template overrides")
     u.add_argument("dir")
     u.add_argument("--to", help="target version (default: latest)")
     args = ap.parse_args()
     handler = {"new": cmd_new, "favicons": cmd_favicons, "sync": cmd_sync,
-               "check": cmd_check, "upgrade": cmd_upgrade}[args.cmd]
+               "check": cmd_check, "measure": cmd_measure, "upgrade": cmd_upgrade}[args.cmd]
     try:
         return handler(args)
     except SiteError as err:
