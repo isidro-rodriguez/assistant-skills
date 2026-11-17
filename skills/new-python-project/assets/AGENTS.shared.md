@@ -1,81 +1,44 @@
 <!-- shared:start — managed by assistant-skills/new-python-project (scaffold.py sync). Edit there, not here. -->
-## Language
+## Shared rules
 
-- **Code and identifiers in English**: variables, functions, classes, modules and tests.
-- **Human-facing text in Spanish**: docstrings, comments, README, `docs/`, CHANGELOG, commits
-  and messages shown to users. Exception names and internal identifiers stay in English.
-- This file is in English so the agent does not need to translate instructions.
+**Language.** Code and identifiers in English. Docstrings, comments, README, `docs/`,
+CHANGELOG, commits and user-facing messages in Spanish. This file stays in English.
 
-## Tools and canonical commands
+**Tools.** `uv` only, never `pip install`; run everything from the project root.
+Quality gate: `uv run ruff format --check .`, `uv run ruff check .`, `uv run ty check`,
+`uv run pytest`. The same gate as `poe check`, if Poe the Poet is installed globally; poe is
+never a project dependency, and everything must also work with plain `uv run`.
 
-`uv` only: never `pip install`. Run everything from the project root.
+**Workflow.**
 
-```bash
-uv sync                      # install the project and its dev group
-uv add <pkg>                 # runtime dependency (uv add --dev <pkg> for dev)
-uv run ruff format .
-uv run ruff check .
-uv run ty check
-uv run pytest
-```
+1. Read `README.md`, `pyproject.toml`, this file and the related tests before changing code.
+2. Make the smallest change that solves the task: no unrelated refactors, no formatting of
+   untouched files, no new dependency without a reason (prefer the standard library).
+3. Don't change CI, tool configuration or project structure unless the task needs it.
+4. Don't run a failing command more than twice: stop, give the root cause and the exact error,
+   propose the minimal fix and ask.
+5. Don't run state-changing git commands (commit, push, tag, reset, rebase) unless the user
+   asks or the commit policy in **Project rules** allows it. Never `--no-verify`.
+6. Leave no secrets, temporary files or TODOs without context. Never hand-edit `uv.lock`.
 
-Optional Poe the Poet shortcuts (`uv tool install poethepoet`) live in `[tool.poe]`:
-`poe check` (format check, lint, types, tests), `poe fix`, `poe backup`. Poe is not a project
-dependency: CI, hooks and docs must work with plain `uv run`.
+**Code.** Google-style docstrings: complete for public identifiers (`Raises` included), one
+line for private ones. Comments explain the *why*. Prefer simple, explicit code;
+`pathlib` over `os.path`. Ruff and ty enforce the rest; don't fight them with ignores.
 
-## Agent workflow
+**Tests.** `pytest` in `tests/`. Cover relevant logic and every fixed bug; they must pass on
+Linux and Windows.
 
-1. Before changing anything, read `README.md`, `pyproject.toml`, this file and the related tests.
-2. Make the smallest change that solves the task. Do not refactor unrelated code or format
-   unrelated files.
-3. New dependency only with a reason; if the standard library solves it, use that.
-4. Do not change CI, tool configuration (Ruff, ty, pytest) or the project structure unless the
-   task requires it.
-5. Do not re-run a failing command more than twice: stop, state the root cause and the exact
-   error, and propose the minimal fix.
-6. Do not leave secrets, temporary files or TODOs without context.
-7. If you cannot ask, choose the minimal change and state the assumption in your report.
+**Commits.** Conventional Commits in Spanish (`feat:`, `fix:`, `docs:`, `test:`,
+`refactor:`, `chore:`), one intent per commit, explaining the *why*.
 
-## Code rules
+**Releases.** Only for versioned projects (a real version and `CHANGELOG.md`). Before
+pushing changes to the package, use the `python-release` skill. Without it: SemVer bump,
+`## [Unreleased]` → `## [X.Y.Z] - YYYY-MM-DD` in `CHANGELOG.md`, `uv lock`, then
+`chore: bump versión a X.Y.Z`. Never tag without confirmation.
 
-- PEP 8, idiomatic Python, strict type annotations on every signature; `pathlib` over `os.path`.
-- Google-style docstrings: complete for public identifiers (with an example when it helps),
-  one line for private ones. A public docstring lists in `Raises` what it lets propagate.
-- Comments explain the *why*, never the *what*.
-- Prefer simple, explicit code over abstractions; small functions with clear English names.
+**Done** when the quality gate and any extra gate in **Project rules** pass, and the README
+and docs reflect any change in usage.
 
-## Tests
-
-- `pytest`, files in `tests/`, run with `uv run pytest` from the root.
-- Cover relevant logic and every fixed bug. Useful, readable tests over coverage numbers.
-- Tests must pass on Linux and Windows.
-
-## Commits
-
-- Conventional Commits in Spanish (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`),
-  atomic, explaining the *why*. Do not mix unrelated changes.
-- Never use `git commit --no-verify` unless the user asks.
-- Commit policy for this project: see **Project rules** below.
-
-## Releases
-
-Versioned projects (a real version and `CHANGELOG.md`): before pushing changes that affect the
-package, prepare the release with the **`python-release`** skill. Without that skill: bump the
-version (SemVer), move `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD` in `CHANGELOG.md`
-(Keep a Changelog, Spanish), run `uv lock`, and commit `chore: bump versión a X.Y.Z`.
-Never create or push tags without explicit confirmation. How the project publishes: see
-**Project rules**.
-
-## Definition of done
-
-- `poe check` passes (or `uv run ruff format --check .`, `uv run ruff check .`,
-  `uv run ty check` and `uv run pytest`), plus any extra gate listed in **Project rules**.
-- README and docs updated if usage or the public API changed.
-
-## Limits
-
-- Do not modify this file without a justified reason; shared sections change in
-  assistant-skills, not here.
-- Do not hand-edit `uv.lock`; regenerate it with `uv`.
-- Do not add unnecessary dependencies or rewrite code the task does not need.
+Project rules below take precedence over these. Shared rules change in assistant-skills
+(`scaffold.py sync`), not by hand here.
 <!-- shared:end -->
