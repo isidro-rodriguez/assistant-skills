@@ -213,11 +213,27 @@ def git_info(root: Path) -> dict:
     if not shutil.which("git") or run(["git", "rev-parse"], root).returncode:
         return {"git": False}
     tag = run(["git", "describe", "--tags", "--abbrev=0"], root).stdout.strip() or None
-    rng = f"{tag}..HEAD" if tag else "HEAD"
+    base, base_kind = tag, "tag"
+    if not tag:
+        # No tags (unpublished projects): start from the last release commit, i.e. the most
+        # recent one that changed the version or added a dated CHANGELOG section.
+        try:
+            vfile, _ = version_source(root)
+            paths = [str(vfile.relative_to(root))]
+            if (root / "CHANGELOG.md").exists():
+                paths.append("CHANGELOG.md")
+            last = run(["git", "log", "-1", "--format=%h", "-G",
+                        r"^((__version__|version)\s*(:\s*str)?\s*=|## \[[0-9])", "--", *paths],
+                       root).stdout.strip()
+            base, base_kind = (last or None), "last release commit"
+        except ReleaseError:
+            base = None
+    rng = f"{base}..HEAD" if base else "HEAD"
     log = run(["git", "log", "--format=%s", rng, "--", "."], root).stdout.splitlines()
     dirty = bool(run(["git", "status", "--porcelain", "--", "."], root).stdout.strip())
     shallow = run(["git", "rev-parse", "--is-shallow-repository"], root).stdout.strip() == "true"
-    return {"git": True, "last_tag": tag, "commits": log, "dirty": dirty, "shallow": shallow}
+    return {"git": True, "last_tag": tag, "since": f"{base} ({base_kind})" if base else "beginning",
+            "commits": log, "dirty": dirty, "shallow": shallow}
 
 
 def suggest(commits: list[str]) -> tuple[str | None, dict]:
@@ -282,7 +298,8 @@ def cmd_status(root: Path, as_json: bool) -> int:
     g = git_info(root)
     if g.get("git"):
         level, kinds = suggest(g["commits"])
-        info["git"] = {"last_tag": g["last_tag"], "commits_since_tag": len(g["commits"]),
+        info["git"] = {"last_tag": g["last_tag"], "counted_since": g["since"],
+                       "commits_since": len(g["commits"]), "commits": g["commits"][:15],
                        "commit_types": kinds, "suggested_bump": level,
                        "uncommitted_changes": g["dirty"], "shallow_clone": g["shallow"]}
     info["lock"] = lock_state(root)
