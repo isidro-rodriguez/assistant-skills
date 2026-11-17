@@ -63,8 +63,8 @@ The goal is an `AGENTS.md` that tells an agent the truth about the repo **as it 
 with the shared rules in one block and only what is specific underneath. The old file is
 evidence, not the source of truth: it can describe a layout that no longer exists (acodo's
 still described a monorepo long gone), and rules that matter can live only in configuration
-(acodo's CI ran `ty --error-on-warning` while its CLAUDE.md said `ty check`, so an agent
-passed locally and failed in CI).
+(acodo publishes to PyPI on every push to `main` that touches the package, which only
+`publish.yml` said).
 
 1. **Gather the evidence.** Read the old `CLAUDE.md`/`AGENTS.md`, the README, `pyproject.toml`
    (including `[tool.poe]`, `[tool.ruff]`, `[tool.ty]`, build backend), the file tree
@@ -75,9 +75,11 @@ passed locally and failed in CI).
    commands, finished migrations) are dropped and listed in the report — carrying them over
    is worse than losing them, because an agent will act on them.
 3. **Harvest rules that only live in configuration.** Anything an agent must know to avoid
-   a surprise: CI steps stricter than the shared gate (flags like `--error-on-warning`,
-   coverage, strict builds), how and when the project publishes (on push, on tag, manual),
-   generated files, extra Poe tasks, deploy chains.
+   a surprise: CI steps stricter than the shared gate (a coverage threshold, a strict
+   docs build, extra linters), how and when the project publishes (on push, on tag,
+   manual), generated files, extra Poe tasks, deploy chains. Before documenting a flag as
+   stricter, check it really changes the result (`ty --error-on-warning`, for instance, is
+   already ty's default behaviour and adds nothing).
 4. **Sort what remains:**
    - **Covered by the shared block:** drop it. Compare meaning, not wording.
    - **Specific to this repo** (purpose, structure, domain conventions, extra gates,
