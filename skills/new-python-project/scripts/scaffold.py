@@ -2,9 +2,10 @@
 """Create Python projects from acodo-template and keep their AGENTS.md shared rules in sync.
 
 Subcommands:
-  new NAME --dest DIR   Copy the template, rename the package and project, reset version
-                        and CHANGELOG, write AGENTS.md (+ CLAUDE.md importing it), git init
-                        and uv lock.
+  new NAME --dest DIR   Copy the template, rename the package, project and command, remove
+                        <!-- template-only --> blocks, reset version and CHANGELOG, rebuild
+                        AGENTS.md from the template's own Project rules with the current
+                        shared block (+ CLAUDE.md importing it), git init and uv lock.
   sync DIR              Replace the shared block (between <!-- shared:start --> and
                         <!-- shared:end -->) in DIR/AGENTS.md with the current one.
   assemble DIR --rules FILE --name NAME --description TEXT
@@ -13,7 +14,7 @@ Subcommands:
                         "@AGENTS.md". Used by migrate, so the layout is always identical.
   check DIR             Exit 1 if DIR/AGENTS.md is missing the shared block or it has drifted.
 
-Options for `new`: --description, --python (default 3.13), --template (git URL or local path;
+Options for `new`: --description, --template (git URL or local path;
 default the public acodo-template), --no-git, --no-lock.
 """
 from __future__ import annotations
@@ -32,6 +33,11 @@ ASSETS = HERE.parent / "assets"
 TEMPLATE_URL = "https://github.com/isidro-rodriguez/acodo-template"
 TEMPLATE_PKG, TEMPLATE_NAME = "acodo_template", "acodo-template"
 SHARED_RE = re.compile(r"<!-- shared:start.*?<!-- shared:end -->\n?", re.S)
+# Markers count only on a line of their own, so prose may quote them safely.
+TEMPLATE_ONLY_RE = re.compile(
+    r"^[ \t]*<!-- template-only:start -->[ \t]*\n.*?^[ \t]*<!-- template-only:end -->[ \t]*(?:\n|\Z)",
+    re.S | re.M)
+MARKER_LINE_RE = re.compile(r"^[ \t]*<!-- template-only:(?:start|end) -->[ \t]*$", re.M)
 NAME_RE = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+)*$")
 TEXT_SUFFIXES = {".py", ".toml", ".md", ".yaml", ".yml", ".txt", ".cfg", ".ini", ""}
 
@@ -77,17 +83,27 @@ def compose(name: str, description: str, project_rules: str) -> str:
             + shared_block().rstrip("\n") + "\n\n" + rules + "\n")
 
 
-def render_agents(name: str, description: str, package: str, python: str) -> str:
-    text = (ASSETS / "AGENTS.project.md").read_text(encoding="utf-8")
-    rules = text[text.index("## Project rules"):]
-    for key, val in {"{package}": package, "{python}": python}.items():
-        rules = rules.replace(key, val)
-    return compose(name, description, rules)
+def strip_template_only(text: str) -> str:
+    """Remove <!-- template-only --> blocks and the blank-line runs they leave behind."""
+    return re.sub(r"\n{3,}", "\n\n", TEMPLATE_ONLY_RE.sub("", text))
+
+
+def project_rules_of(agents_md: str) -> str:
+    """The '## Project rules' section of an AGENTS.md (template-only blocks removed)."""
+    i = agents_md.find("## Project rules")
+    if i < 0:
+        raise ScaffoldError("The template's AGENTS.md has no '## Project rules' section; "
+                            "migrate the template first (see SKILL.md › migrate).")
+    return strip_template_only(agents_md[i:])
 
 
 def _fetch_template(src: str, dest: Path) -> None:
     if Path(src).is_dir():
-        shutil.copytree(src, dest, ignore=shutil.ignore_patterns(".git", ".venv", "__pycache__"))
+        # A local template may have been used: leave out git data, environments,
+        # caches and build output, and respect nothing else.
+        shutil.copytree(src, dest, ignore=shutil.ignore_patterns(
+            ".git", ".venv", "__pycache__", ".ruff_cache", ".pytest_cache", ".coverage",
+            "coverage.xml", "htmlcov", "dist", "build", "site", "*.egg-info", "*.bundle"))
         return
     with tempfile.TemporaryDirectory() as tmp:
         r = subprocess.run(["git", "clone", "-q", "--depth", "1", src, f"{tmp}/t"],
@@ -101,7 +117,10 @@ def _replace_everywhere(root: Path, pairs: list[tuple[str, str]]) -> None:
     for f in root.rglob("*"):
         if not f.is_file() or f.suffix not in TEXT_SUFFIXES or f.name == "uv.lock":
             continue
-        text = f.read_text(encoding="utf-8")
+        try:
+            text = f.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue  # binary file without a telling suffix
         new = text
         for a, b in pairs:
             new = new.replace(a, b)
@@ -129,20 +148,25 @@ def cmd_new(args) -> int:
     text = py.read_text(encoding="utf-8")
     text = re.sub(r'^version = ".*"$', 'version = "0.1.0"', text, count=1, flags=re.M)
     text = re.sub(r'^description = ".*"$', f'description = "{args.description}"', text, count=1, flags=re.M)
-    # Console script named after the project instead of the template's generic `main`.
-    text = re.sub(r'^main = "(\w+)\.main:main"$', rf'{name} = "\1.main:main"', text, count=1, flags=re.M)
     py.write_text(text, encoding="utf-8")
 
     (dest / "CHANGELOG.md").write_text(CHANGELOG.format(name=name), encoding="utf-8")
-    (dest / "AGENTS.md").write_text(
-        render_agents(name, args.description, package, args.python), encoding="utf-8")
+    agents = dest / "AGENTS.md"
+    if not agents.exists():
+        raise ScaffoldError("The template has no AGENTS.md; migrate the template first.")
+    agents.write_text(compose(name, args.description,
+                              project_rules_of(agents.read_text(encoding="utf-8"))),
+                      encoding="utf-8")
     shutil.copy(ASSETS / "CLAUDE.md", dest / "CLAUDE.md")
     readme = dest / "README.md"
-    rtext = readme.read_text(encoding="utf-8")
-    rtext = re.sub(r"^# .*$", f"# {name}\n\n{args.description}", rtext, count=1, flags=re.M)
-    rtext = rtext.replace("uv run main ", f"uv run {name} ")
-    rtext = re.sub(r"^Renombra el paquete.*\n\n?", "", rtext, flags=re.M)
+    rtext = strip_template_only(readme.read_text(encoding="utf-8"))
+    rtext = re.sub(r"^# .*\n+", f"# {name}\n\n{args.description}\n\n", rtext, count=1, flags=re.M)
     readme.write_text(rtext, encoding="utf-8")
+    leftovers = [str(f.relative_to(dest)) for f in dest.rglob("*")
+                 if f.is_file() and f.suffix in {".md", ".toml", ".yaml", ".yml"}
+                 and MARKER_LINE_RE.search(f.read_text(encoding="utf-8", errors="ignore"))]
+    if leftovers:
+        raise ScaffoldError(f"Unbalanced template-only markers left in: {', '.join(leftovers)}")
 
     notes = []
     if not args.no_lock:
@@ -211,7 +235,6 @@ def main() -> int:
     n.add_argument("name")
     n.add_argument("--dest", required=True)
     n.add_argument("--description", default="Proyecto Python.")
-    n.add_argument("--python", default="3.13")
     n.add_argument("--template", default=TEMPLATE_URL)
     n.add_argument("--no-git", action="store_true")
     n.add_argument("--no-lock", action="store_true")

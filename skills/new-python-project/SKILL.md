@@ -4,7 +4,7 @@ description: Start a new Python project from acodo-template (uv, ruff, ty, pytes
 license: MIT
 compatibility: Python 3.11+, git; uv to lock and run the quality gate. Clones https://github.com/isidro-rodriguez/acodo-template unless --template points to a local copy.
 metadata:
-  version: "0.2.0"
+  version: "0.3.0"
   author: isidro-rodriguez
 ---
 
@@ -31,7 +31,6 @@ Three jobs:
 | Project name (new) | yes | Ask. It must be lowercase kebab-case; the package becomes snake_case |
 | One-line description (new) | no | Ask if it isn't obvious from the request; it goes into `pyproject.toml`, the README and `AGENTS.md` |
 | Destination folder (new) | no | `./<name>` |
-| Python version (new) | no | 3.13 (the template's minimum) |
 
 ## Procedure
 
@@ -39,22 +38,24 @@ Scripts run from the skill folder: `python scripts/scaffold.py <command> …`.
 
 ### new
 
-1. Run `new <name> --dest <dir> --description "<text>"`. Add `--template <path>`
-   to use a local copy of acodo-template instead of cloning it. The script:
-   - copies the template, renames `acodo_template`/`acodo-template` everywhere
-     and names the console script after the project;
-   - sets version 0.1.0 and a fresh `CHANGELOG.md`;
-   - writes `AGENTS.md` and `CLAUDE.md`, runs `git init` and `uv lock`.
-2. Rewrite the README introduction for the real project. The template's
-   paragraph describes the template, not the new project. Keep the README
-   minimal: what it is, installation, usage, quality commands and links.
-3. Fill in **Project rules** in `AGENTS.md` with what you know: purpose, any
-   structure beyond the template, publishing. Leave the placeholder if
-   publishing is undecided. Don't edit the shared block: changes made there
-   are overwritten on the next sync, and the other repos never see them.
-4. Run `uv sync` and the quality gate (`poe check`, or the four `uv run`
-   commands). It must pass before you report back.
-5. Don't commit. Report what was created and propose
+The template (acodo-template) carries its own `AGENTS.md` (shared block + Project rules
+written for a derived project) and marks template-only text in `README.md` and `AGENTS.md`
+with `<!-- template-only:start -->` / `<!-- template-only:end -->` lines. The script relies on
+that, so improvements to the project rules are made once, in the template.
+
+1. Run `new <name> --dest <dir> --description "<text>"` (`--template <path>` for a local copy).
+   The script copies the template without caches or build output, renames
+   `acodo_template`/`acodo-template` everywhere (package, project, command, URLs), removes the
+   template-only blocks, puts the description under the README title, sets version 0.1.0 and a
+   fresh `CHANGELOG.md`, rebuilds `AGENTS.md` from the template's Project rules with the
+   current shared block, writes `CLAUDE.md`, runs `git init` and `uv lock`. It refuses to
+   finish if a template-only marker is left unbalanced.
+2. Read the result with the user's goal in mind: adjust **Project rules** (purpose,
+   publishing once decided) and the README usage if the project is not a CLI. Don't edit the
+   shared block: changes made there are overwritten on the next sync.
+3. Run `uv sync` and the quality gate (`poe check`, or the four `uv run` commands); it must
+   pass before you report back.
+4. Don't commit. Report what was created and propose
    `chore: estructura inicial desde acodo-template`.
 
 ### migrate (existing repo)
@@ -123,6 +124,6 @@ still described a monorepo long gone), and rules that matter can live only in co
 
 - [ ] `scaffold.py check <dir>` prints OK.
 - [ ] `CLAUDE.md` contains `@AGENTS.md` and nothing that contradicts it.
-- [ ] **new:** no `acodo_template`/`acodo-template` left outside `CHANGELOG.md`; the quality gate passes; the README describes the new project.
+- [ ] **new:** no `acodo_template`/`acodo-template` or template-only text left outside `CHANGELOG.md`; the command is named after the project; the quality gate passes; the README describes the new project.
 - [ ] **migrate:** every rule of the old file is kept, or reported as covered, stale or conflicting — nothing silently lost; every path and command in Project rules exists in the repo; CI-only constraints and the publishing method are documented.
 - [ ] Nothing committed or pushed beyond what the project's rules and the user allowed.
