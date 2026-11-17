@@ -113,6 +113,18 @@ def _fetch_template(src: str, dest: Path) -> None:
         shutil.copytree(f"{tmp}/t", dest, ignore=shutil.ignore_patterns(".git"))
 
 
+def _keep_comment_column(line: str, old: str, new: str) -> str:
+    """Replace in one line, keeping a trailing `# comment` in the same column (tree diagrams)."""
+    body, eol = (line[:-1], "\n") if line.endswith("\n") else (line, "")
+    out = body.replace(old, new)
+    m = re.match(r"^(.*?\S)( {2,})(#.*)$", out)
+    if old in body and m:
+        delta = len(out) - len(body)
+        pad = max(1, len(m.group(2)) - delta)
+        out = f"{m.group(1)}{' ' * pad}{m.group(3)}"
+    return out + eol
+
+
 def _replace_everywhere(root: Path, pairs: list[tuple[str, str]]) -> None:
     for f in root.rglob("*"):
         if not f.is_file() or f.suffix not in TEXT_SUFFIXES or f.name == "uv.lock":
@@ -123,7 +135,8 @@ def _replace_everywhere(root: Path, pairs: list[tuple[str, str]]) -> None:
             continue  # binary file without a telling suffix
         new = text
         for a, b in pairs:
-            new = new.replace(a, b)
+            if a in new:
+                new = "".join(_keep_comment_column(ln, a, b) for ln in new.splitlines(keepends=True))
         if new != text:
             f.write_text(new, encoding="utf-8")
 
@@ -136,6 +149,8 @@ def cmd_new(args) -> int:
     dest = Path(args.dest).resolve()
     if dest.exists() and any(dest.iterdir()):
         raise ScaffoldError(f"{dest} exists and is not empty.")
+    if dest.exists():
+        dest.rmdir()  # empty folder: copytree needs to create it
     _fetch_template(args.template, dest)
 
     (dest / "src" / TEMPLATE_PKG).rename(dest / "src" / package)
@@ -151,6 +166,11 @@ def cmd_new(args) -> int:
     py.write_text(text, encoding="utf-8")
 
     (dest / "CHANGELOG.md").write_text(CHANGELOG.format(name=name), encoding="utf-8")
+    init = dest / "src" / package / "__init__.py"
+    if init.exists():  # package docstring: the template's describes the template
+        itext = init.read_text(encoding="utf-8")
+        init.write_text(re.sub(r'^"""[^\n]*"""', f'"""{args.description}"""', itext, count=1),
+                        encoding="utf-8")
     agents = dest / "AGENTS.md"
     if not agents.exists():
         raise ScaffoldError("The template has no AGENTS.md; migrate the template first.")

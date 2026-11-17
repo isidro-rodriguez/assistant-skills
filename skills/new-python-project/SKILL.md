@@ -4,7 +4,7 @@ description: Start a new Python project from acodo-template (uv, ruff, ty, pytes
 license: MIT
 compatibility: Python 3.11+, git; uv to lock and run the quality gate. Clones https://github.com/isidro-rodriguez/acodo-template unless --template points to a local copy.
 metadata:
-  version: "0.3.0"
+  version: "0.3.1"
   author: isidro-rodriguez
 ---
 
@@ -72,9 +72,15 @@ still described a monorepo long gone), and rules that matter can live only in co
    (`git ls-files`), `.github/workflows/*` (CI steps, publishing, docs deploy),
    `.pre-commit-config.yaml` and any deploy config (`vercel.json`…).
 2. **Check every old rule against the repo.** For each rule, confirm the paths, commands and
-   structure it mentions exist and behave as it says. Stale rules (removed folders, old
-   commands, finished migrations) are dropped and listed in the report — carrying them over
-   is worse than losing them, because an agent will act on them.
+   structure it mentions. A rule is **stale** only when the repo shows it was replaced: the
+   layout changed (a workspace became one package, a folder was renamed), a command or flag
+   was superseded, a migration it describes is finished. Drop stale rules and list them in the
+   report, because an agent would act on them.
+   A path that is simply missing is **not** evidence by itself: a rule may describe code that
+   is not written yet, or a part this checkout lacks. When the rule states an intent
+   (gettext for messages, `Decimal` for money, generated fixtures, how to publish) and nothing
+   in the repo contradicts it, keep it and mark it as unverified in the report. Losing a valid
+   rule silently is worse than keeping one the user can strike out.
 3. **Harvest rules that only live in configuration.** Anything an agent must know to avoid
    a surprise: CI steps stricter than the shared gate (a coverage threshold, a strict
    docs build, extra linters), how and when the project publishes (on push, on tag,
@@ -100,7 +106,8 @@ still described a monorepo long gone), and rules that matter can live only in co
 6. **Verify.** `scaffold.py check <repo>` says OK, and the repo's full gate (shared + extra
    gates you documented) passes, confirming nothing but the instructions changed.
 7. **Report:** lines before → after; stale rules dropped (one line each, with what the repo
-   has instead); rules harvested from configuration; rules dropped as covered; conflicts.
+   has instead); rules kept but unverified; rules harvested from configuration; rules dropped
+   as covered; conflicts.
    Don't commit unless the project's rules allow it; propose
    `docs: migra CLAUDE.md a AGENTS.md con reglas compartidas`.
 
@@ -125,5 +132,5 @@ still described a monorepo long gone), and rules that matter can live only in co
 - [ ] `scaffold.py check <dir>` prints OK.
 - [ ] `CLAUDE.md` contains `@AGENTS.md` and nothing that contradicts it.
 - [ ] **new:** no `acodo_template`/`acodo-template` or template-only text left outside `CHANGELOG.md`; the command is named after the project; the quality gate passes; the README describes the new project.
-- [ ] **migrate:** every rule of the old file is kept, or reported as covered, stale or conflicting — nothing silently lost; every path and command in Project rules exists in the repo; CI-only constraints and the publishing method are documented.
+- [ ] **migrate:** every rule of the old file is kept (verified or not), or reported as covered, stale (with what replaced it) or conflicting — nothing silently lost; every path and command in Project rules exists in the repo; CI-only constraints and the publishing method are documented.
 - [ ] Nothing committed or pushed beyond what the project's rules and the user allowed.
