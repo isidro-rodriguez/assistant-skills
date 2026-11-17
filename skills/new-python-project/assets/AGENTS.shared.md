@@ -21,9 +21,11 @@ never a project dependency, and everything must also work with plain `uv run`.
    asks or the commit policy in **Project rules** allows it. Never `--no-verify`.
 6. Leave no secrets, temporary files or TODOs without context. Never hand-edit `uv.lock`.
 
-**Code.** Google-style docstrings: complete for public identifiers (`Raises` included), one
-line for private ones. Comments explain the *why*. Prefer simple, explicit code;
-`pathlib` over `os.path`. Ruff and ty enforce the rest; don't fight them with ignores.
+**Code.** Strict type hints on every signature. Google-style docstrings: complete for public
+identifiers, one line for private ones; a public docstring's `Raises` also lists the
+exceptions raised by the private functions it calls. Comments explain the *why*. Prefer
+simple, explicit code; `pathlib` over `os.path`. Ruff and ty enforce the rest; don't fight
+them with ignores.
 
 **Tests.** `pytest` in `tests/`. Cover relevant logic and every fixed bug; they must pass on
 Linux and Windows.
