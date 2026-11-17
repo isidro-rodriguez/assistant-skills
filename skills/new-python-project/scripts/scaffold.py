@@ -7,6 +7,10 @@ Subcommands:
                         and uv lock.
   sync DIR              Replace the shared block (between <!-- shared:start --> and
                         <!-- shared:end -->) in DIR/AGENTS.md with the current one.
+  assemble DIR --rules FILE --name NAME --description TEXT
+                        Write DIR/AGENTS.md as header + shared block + FILE (the project
+                        rules, starting with "## Project rules") and DIR/CLAUDE.md as
+                        "@AGENTS.md". Used by migrate, so the layout is always identical.
   check DIR             Exit 1 if DIR/AGENTS.md is missing the shared block or it has drifted.
 
 Options for `new`: --description, --python (default 3.13), --template (git URL or local path;
@@ -54,12 +58,31 @@ def shared_block() -> str:
     return (ASSETS / "AGENTS.shared.md").read_text(encoding="utf-8")
 
 
+HEADER = """# AGENTS.md
+
+Instructions for AI agents working on **{name}**: {description}
+
+The shared sections below are the same in every project. Project-specific rules are at the
+end, under **Project rules**, and take precedence when they differ.
+
+"""
+
+
+def compose(name: str, description: str, project_rules: str) -> str:
+    """Header + shared block + project rules, with one blank line between parts."""
+    rules = project_rules.strip("\n")
+    if not rules.startswith("## Project rules"):
+        raise ScaffoldError("Project rules must start with a '## Project rules' heading.")
+    return (HEADER.replace("{name}", name).replace("{description}", description.strip())
+            + shared_block().rstrip("\n") + "\n\n" + rules + "\n")
+
+
 def render_agents(name: str, description: str, package: str, python: str) -> str:
     text = (ASSETS / "AGENTS.project.md").read_text(encoding="utf-8")
-    for key, val in {"{shared}": shared_block().rstrip("\n"), "{name}": name,
-                     "{description}": description, "{package}": package, "{python}": python}.items():
-        text = text.replace(key, val)
-    return text
+    rules = text[text.index("## Project rules"):]
+    for key, val in {"{package}": package, "{python}": python}.items():
+        rules = rules.replace(key, val)
+    return compose(name, description, rules)
 
 
 def _fetch_template(src: str, dest: Path) -> None:
@@ -152,6 +175,16 @@ def cmd_sync(args) -> int:
     return 0
 
 
+def cmd_assemble(args) -> int:
+    d = Path(args.dir)
+    rules = Path(args.rules).read_text(encoding="utf-8")
+    (d / "AGENTS.md").write_text(compose(args.name, args.description, rules), encoding="utf-8")
+    shutil.copy(ASSETS / "CLAUDE.md", d / "CLAUDE.md")
+    n = len((d / "AGENTS.md").read_text(encoding="utf-8").splitlines())
+    print(f"Wrote {d / 'AGENTS.md'} ({n} lines) and CLAUDE.md (@AGENTS.md).")
+    return 0
+
+
 def cmd_check(args) -> int:
     f = Path(args.dir) / "AGENTS.md"
     if not f.exists():
@@ -184,9 +217,15 @@ def main() -> int:
     n.add_argument("--no-lock", action="store_true")
     for c in ("sync", "check"):
         sub.add_parser(c).add_argument("dir")
+    a = sub.add_parser("assemble")
+    a.add_argument("dir")
+    a.add_argument("--rules", required=True, help="file with the project rules")
+    a.add_argument("--name", required=True)
+    a.add_argument("--description", required=True)
     args = ap.parse_args()
     try:
-        return {"new": cmd_new, "sync": cmd_sync, "check": cmd_check}[args.cmd](args)
+        return {"new": cmd_new, "sync": cmd_sync, "check": cmd_check,
+                "assemble": cmd_assemble}[args.cmd](args)
     except ScaffoldError as e:
         print(f"FAIL: {e}", file=sys.stderr)
         return 1

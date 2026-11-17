@@ -1,12 +1,3 @@
-# AGENTS.md
-
-Instructions for AI agents working on **{name}**: {description}
-
-The shared sections below are the same in every project. Project-specific rules are at the
-end, under **Project rules**, and take precedence when they differ.
-
-{shared}
-
 ## Project rules
 
 ### Structure

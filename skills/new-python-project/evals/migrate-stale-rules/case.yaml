@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: migrate-stale-rules
+expected_outcome: |
+  AGENTS.md describes the real single-package repo (no workspace), documents the CI-only ty --error-on-warning flag and tag-based publishing, and the report lists the stale workspace rules it dropped.
+context:
+  scaffold_script: place-files.sh

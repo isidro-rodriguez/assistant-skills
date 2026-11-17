@@ -4,7 +4,7 @@ description: Start a new Python project from acodo-template (uv, ruff, ty, pytes
 license: MIT
 compatibility: Python 3.11+, git; uv to lock and run the quality gate. Clones https://github.com/isidro-rodriguez/acodo-template unless --template points to a local copy.
 metadata:
-  version: "0.1.0"
+  version: "0.2.0"
   author: isidro-rodriguez
 ---
 
@@ -59,29 +59,44 @@ Scripts run from the skill folder: `python scripts/scaffold.py <command> …`.
 
 ### migrate (existing repo)
 
-The goal is a shorter `AGENTS.md` that keeps every rule the repo really needs.
+The goal is an `AGENTS.md` that tells an agent the truth about the repo **as it is now**,
+with the shared rules in one block and only what is specific underneath. The old file is
+evidence, not the source of truth: it can describe a layout that no longer exists (acodo's
+still described a monorepo long gone), and rules that matter can live only in configuration
+(acodo's CI ran `ty --error-on-warning` while its CLAUDE.md said `ty check`, so an agent
+passed locally and failed in CI).
 
-1. Read the repo's current `CLAUDE.md` and/or `AGENTS.md`, `pyproject.toml`
-   and README.
-2. Sort every rule into one of three groups:
+1. **Gather the evidence.** Read the old `CLAUDE.md`/`AGENTS.md`, the README, `pyproject.toml`
+   (including `[tool.poe]`, `[tool.ruff]`, `[tool.ty]`, build backend), the file tree
+   (`git ls-files`), `.github/workflows/*` (CI steps, publishing, docs deploy),
+   `.pre-commit-config.yaml` and any deploy config (`vercel.json`…).
+2. **Check every old rule against the repo.** For each rule, confirm the paths, commands and
+   structure it mentions exist and behave as it says. Stale rules (removed folders, old
+   commands, finished migrations) are dropped and listed in the report — carrying them over
+   is worse than losing them, because an agent will act on them.
+3. **Harvest rules that only live in configuration.** Anything an agent must know to avoid
+   a surprise: CI steps stricter than the shared gate (flags like `--error-on-warning`,
+   coverage, strict builds), how and when the project publishes (on push, on tag, manual),
+   generated files, extra Poe tasks, deploy chains.
+4. **Sort what remains:**
    - **Covered by the shared block:** drop it. Compare meaning, not wording.
-   - **Specific to this repo** (structure, domain conventions, content rules,
-     extra quality gates, deploy and publishing, commit policy, "don't touch"
-     files): keep it under **Project rules**, tightened but not reworded into
-     something else.
-   - **Conflicting with the shared block:** keep the project's version under
-     Project rules, which take precedence, and list each conflict in your
-     report so the user can decide whether it should become shared.
-3. Write the new `AGENTS.md`: a title and one-line purpose, then the shared
-   block verbatim (copy `assets/AGENTS.shared.md`, markers included), then
-   `## Project rules`. Replace `CLAUDE.md` with `assets/CLAUDE.md` (`@AGENTS.md`).
-   If the repo's README says where the agent rules live, update that line.
-4. Run `scaffold.py check <repo>`, which must say OK. Then run the repo's own
-   quality gate to confirm nothing in the code changed.
-5. Report: lines before and after, what moved where, any rules dropped as
-   covered (one line each), and the conflicts. Don't commit unless the
-   project's rules allow it; propose `docs: migra CLAUDE.md a AGENTS.md con
-   reglas compartidas`.
+   - **Specific to this repo** (purpose, structure, domain conventions, extra gates,
+     publishing, commit policy, "don't touch" files): keep it under **Project rules**,
+     tightened but not reworded into something else.
+   - **Conflicting with the shared block:** keep the project's version under Project rules
+     (they take precedence) and list each conflict in the report for the user to decide.
+5. **Write the project rules** to a temporary file starting with `## Project rules` (a short
+   "what it is" paragraph first, then `###` subsections), and let the script assemble the
+   file so the layout is identical in every repo:
+   `scaffold.py assemble <repo> --rules <file> --name <name> --description "<one line>"`.
+   It writes `AGENTS.md` (header + shared block + your rules) and `CLAUDE.md` (`@AGENTS.md`).
+   Update any README or comment that points to `CLAUDE.md`.
+6. **Verify.** `scaffold.py check <repo>` says OK, and the repo's full gate (shared + extra
+   gates you documented) passes, confirming nothing but the instructions changed.
+7. **Report:** lines before → after; stale rules dropped (one line each, with what the repo
+   has instead); rules harvested from configuration; rules dropped as covered; conflicts.
+   Don't commit unless the project's rules allow it; propose
+   `docs: migra CLAUDE.md a AGENTS.md con reglas compartidas`.
 
 ### sync
 
@@ -104,5 +119,5 @@ The goal is a shorter `AGENTS.md` that keeps every rule the repo really needs.
 - [ ] `scaffold.py check <dir>` prints OK.
 - [ ] `CLAUDE.md` contains `@AGENTS.md` and nothing that contradicts it.
 - [ ] **new:** no `acodo_template`/`acodo-template` left outside `CHANGELOG.md`; the quality gate passes; the README describes the new project.
-- [ ] **migrate:** every repo-specific rule of the old file is still present (in Project rules) or reported as covered or conflicting. Nothing was silently lost.
+- [ ] **migrate:** every rule of the old file is kept, or reported as covered, stale or conflicting — nothing silently lost; every path and command in Project rules exists in the repo; CI-only constraints and the publishing method are documented.
 - [ ] Nothing committed or pushed beyond what the project's rules and the user allowed.
