@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: upgrade-theme-moved
+expected_outcome: |
+  Zensical 0.1.2 in pyproject.toml and uv.lock, the header override carrying the new theme's changes plus the project's changelog link, the template test looking in zensical_ui, tests and build passing, nothing committed.
+context:
+  scaffold_script: place-files.sh

@@ -1,0 +1,26 @@
+/*
+ * Estilo propio de ${name}: paleta y ajustes del proyecto.
+ * Se carga después de typography.css (común, gestionada por la skill
+ * `zensical-site`) y puede pisar cualquiera de sus reglas.
+ */
+
+:root {
+  --site-primary: ${theme_color};
+}
+
+[data-md-color-scheme="default"],
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: var(--site-primary);
+  --md-primary-fg-color--light: var(--site-primary);
+  --md-primary-fg-color--dark: var(--site-primary);
+  --md-accent-fg-color: var(--site-primary);
+  /* Fondos suaves (elemento activo del menú, resaltados) del mismo color. */
+  --md-accent-fg-color--transparent: color-mix(in srgb, var(--site-primary) 12%, transparent);
+  --md-primary-fg-color--transparent: color-mix(in srgb, var(--site-primary) 12%, transparent);
+}
+
+/* Enlaces del color del proyecto solo sobre fondo claro; en oscuro, los del
+   tema, que ya tienen contraste suficiente. */
+[data-md-color-scheme="default"] {
+  --md-typeset-a-color: var(--site-primary);
+}

@@ -1,0 +1,14 @@
+[project]
+site_name = "tareas-cli"
+site_description = "Gestor de tareas en la terminal."
+site_url = "https://isidro-rodriguez.github.io/tareas-cli/"
+repo_url = "https://github.com/isidro-rodriguez/tareas-cli"
+nav = [
+    { "Inicio" = "index.md" },
+    { "Cambios" = "changelog.md" },
+]
+
+[project.theme]
+language = "es"
+# Cabecera propia con el enlace a los cambios (docs_templates/partials/header.html).
+custom_dir = "docs_templates"

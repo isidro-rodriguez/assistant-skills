@@ -4,7 +4,7 @@ description: Start a new Python project from acodo-template (uv, ruff, ty, pytes
 license: MIT
 compatibility: Python 3.11+, git; uv to lock and run the quality gate. Clones https://github.com/isidro-rodriguez/acodo-template unless --template points to a local copy.
 metadata:
-  version: "0.3.1"
+  version: "0.3.2"
   author: isidro-rodriguez
 ---
 
@@ -53,9 +53,12 @@ that, so improvements to the project rules are made once, in the template.
 2. Read the result with the user's goal in mind: adjust **Project rules** (purpose,
    publishing once decided) and the README usage if the project is not a CLI. Don't edit the
    shared block: changes made there are overwritten on the next sync.
-3. Run `uv sync` and the quality gate (`poe check`, or the four `uv run` commands); it must
+3. If the project needs a documentation site, also use the `zensical-site` skill (`new`)
+   now: it adds `docs/`, `docs_templates/`, the Pages workflow and its own block to the
+   Project rules, which `sync` leaves alone. The two skills can be used together or apart.
+4. Run `uv sync` and the quality gate (`poe check`, or the four `uv run` commands); it must
    pass before you report back.
-4. Don't commit. Report what was created and propose
+5. Don't commit. Report what was created and propose
    `chore: estructura inicial desde acodo-template`.
 
 ### migrate (existing repo)

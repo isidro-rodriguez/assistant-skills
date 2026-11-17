@@ -1,0 +1,52 @@
+# Documentación de tareas-cli.
+[project]
+site_name = "tareas-cli"
+site_description = "Gestor de tareas en la terminal."
+site_author = "Isidro Rodríguez"
+site_url = "https://isidro-rodriguez.github.io/tareas-cli/"
+repo_url = "https://github.com/isidro-rodriguez/tareas-cli"
+repo_name = "isidro-rodriguez/tareas-cli"
+extra_css = ["assets/stylesheets/tareas.css"]
+
+nav = [
+    { "Inicio" = "index.md" },
+    { "Uso" = "uso.md" },
+]
+
+[project.plugins.api-autonav]
+modules = ["src/tareas_cli"]
+api_root_uri = "api"
+nav_section_title = "API"
+
+[project.plugins.mkdocstrings]
+locale = "es"
+custom_templates = "docs_templates"
+
+[project.plugins.mkdocstrings.handlers.python]
+paths = ["src"]
+
+[project.plugins.mkdocstrings.handlers.python.options]
+docstring_style = "google"
+
+[project.theme]
+language = "es"
+favicon = "assets/images/favicon.png"
+logo = "assets/images/logo.png"
+# La consola de la CLI usa JetBrains Mono: la misma letra en los ejemplos.
+font.text = "Roboto"
+font.code = "JetBrains Mono"
+features = [
+  "content.code.copy",
+  "navigation.footer",
+  "navigation.instant",
+  "search.highlight",
+]
+
+[[project.theme.palette]]
+scheme = "default"
+primary = "custom"
+accent = "custom"
+
+[project.markdown_extensions]
+admonition = {}
+pymdownx.superfences = {}

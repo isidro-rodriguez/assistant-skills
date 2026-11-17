@@ -1,0 +1,23 @@
+
+# Referencia de la API generada desde los docstrings.
+# Requiere `mkdocstrings-python` y `mkdocs-api-autonav` (grupo de desarrollo).
+[project.plugins.api-autonav]
+modules = ["src/${package}"]
+api_root_uri = "api"
+nav_section_title = "API"
+
+[project.plugins.mkdocstrings]
+locale = "es"
+# Traducción al español de las plantillas de mkdocstrings.
+custom_templates = "docs_templates"
+
+[project.plugins.mkdocstrings.handlers.python]
+paths = ["src"]
+
+[project.plugins.mkdocstrings.handlers.python.options]
+docstring_style = "google"
+members_order = "source"
+merge_init_into_class = true
+separate_signature = true
+show_signature_annotations = true
+show_source = true

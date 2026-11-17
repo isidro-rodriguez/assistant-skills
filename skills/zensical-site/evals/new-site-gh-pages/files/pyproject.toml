@@ -1,0 +1,15 @@
+[project]
+name = "tareas-cli"
+version = "0.3.0"
+description = "Gestor de tareas en la terminal: añade, lista y completa tareas."
+readme = "README.md"
+authors = [{ name = "Isidro Rodríguez" }]
+requires-python = ">=3.13"
+dependencies = []
+
+[project.scripts]
+tareas-cli = "tareas_cli:main"
+
+[build-system]
+requires = ["uv_build>=0.9,<0.12"]
+build-backend = "uv_build"
