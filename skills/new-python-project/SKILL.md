@@ -80,6 +80,9 @@ still described a monorepo long gone), and rules that matter can live only in co
    manual), generated files, extra Poe tasks, deploy chains. Before documenting a flag as
    stricter, check it really changes the result (`ty --error-on-warning`, for instance, is
    already ty's default behaviour and adds nothing).
+   Known redundant settings to clean up while migrating, each in its own commit and
+   mentioned in the report: `--error-on-warning` on `ty check` in CI or publish workflows
+   (`ci: quita --error-on-warning de ty`).
 4. **Sort what remains:**
    - **Covered by the shared block:** drop it. Compare meaning, not wording.
    - **Specific to this repo** (purpose, structure, domain conventions, extra gates,
