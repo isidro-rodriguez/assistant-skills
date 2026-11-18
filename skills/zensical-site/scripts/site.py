@@ -1,26 +1,20 @@
 #!/usr/bin/env python3
-"""Create, check and upgrade a Zensical documentation site with the canonical layout.
+"""Create, check and upgrade a Zensical documentation site on the techsical theme.
 
 Subcommands:
   new DIR       Create the canonical layout in DIR (never overwrites without --force):
-                zensical.toml, docs/ (index, manifest, favicons, fonts, stylesheets),
-                docs_templates/ (main.html, es.html.jinja with --package) and,
-                with --gh-pages, .github/workflows/docs.yml.
+                zensical.toml (theme techsical), docs/ (index, manifest, favicons,
+                logo), es.html.jinja with --package and, with --gh-pages,
+                .github/workflows/docs.yml.
   favicons DIR  Regenerate docs/assets/favicon/ from a logo (SVG or PNG).
   sync DIR      Refresh the managed copies (es.html.jinja) and the zensical block
                 of AGENTS.md.
   check DIR     Compare DIR with the canonical layout; exit 1 on any FAIL.
-  measure DIR   Measure the built site in a browser against Practical Typography:
-                body text 15-25 px, line spacing 120-145 %, 45-90 characters per
-                line; exit 1 if a page is out of range. Fonts are the project's choice.
-  upgrade DIR   Upgrade Zensical in the lock, then diff every template in
-                docs_templates/ against the new theme and build the site.
+  upgrade DIR   Upgrade techsical and Zensical in the lock, then diff every template
+                in docs_templates/ against the new themes and build the site.
 
 Favicon generation needs Pillow (and resvg-py for SVG logos); run it as
   uv run --with pillow --with resvg-py python scripts/site.py ...
-measure needs Playwright and a Chromium-based browser (Chrome or Edge installed, or
-`playwright install chromium`):
-  uv run --with playwright python scripts/site.py measure .
 Everything else uses only the standard library (Python 3.11+, for tomllib).
 """
 
@@ -43,9 +37,8 @@ from string import Template
 
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
 SITE = ASSETS / "site"
-TYPOGRAPHY = "docs/assets/stylesheets/typography.css"
-FONTS = "docs/assets/fonts"
-MAIN = "docs_templates/main.html"
+THEME = "techsical"
+DEFAULT_PRIMARY = "#164e63"  # techsical's own primary colour
 ES_JINJA = "docs_templates/python/material/languages/es.html.jinja"
 WORKFLOW = ".github/workflows/docs.yml"
 FAVICONS = {  # file name -> square size in px (0: multi-size .ico)
@@ -56,21 +49,29 @@ FAVICONS = {  # file name -> square size in px (0: multi-size .ico)
     "android-chrome-192x192.png": 192,
     "android-chrome-512x512.png": 512,
 }
-HEAD_LINKS = [*(f"assets/favicon/{n}" for n in
-                ("favicon.ico", "favicon-32x32.png", "favicon-16x16.png", "apple-touch-icon.png")),
-              "site.webmanifest"]
+# What techsical already puts in <head>; a site template that repeats it duplicates it.
+HEAD_MARKERS = ("assets/favicon/", "site.webmanifest", "theme-color")
 IGNORED_SITE = {"site/", "/site/", "site", "/site"}
 AGENTS_RE = re.compile(r"<!-- zensical:start.*?<!-- zensical:end -->\n?", re.S)
+# Template folders in lookup order after docs_templates/: techsical's (when the site
+# uses it) and Zensical's own theme (zensical_ui since 0.1, zensical before).
 THEME_PROBE = """
 import importlib.metadata as m, importlib.util as u, json, pathlib
+out = {"dirs": [], "versions": {}}
+spec = u.find_spec("techsical")
+if spec and spec.origin:
+    out["dirs"].append(str(pathlib.Path(spec.origin).parent / "theme"))
+    out["versions"]["techsical"] = m.version("techsical")
 for pkg in ("zensical_ui", "zensical"):
     spec = u.find_spec(pkg)
     if spec and spec.origin:
         d = pathlib.Path(spec.origin).parent / "templates"
         if (d / "base.html").exists():
-            print(json.dumps({"dir": str(d), "package": pkg,
-                              "zensical": m.version("zensical")}))
+            out["dirs"].append(str(d))
+            out["package"] = pkg
+            out["versions"]["zensical"] = m.version("zensical")
             break
+print(json.dumps(out))
 """
 
 
@@ -81,14 +82,6 @@ class SiteError(Exception):
 # ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------
-
-def slugify(name: str) -> str:
-    """Lowercase ASCII slug for file names (``pyMedia`` -> ``pymedia``)."""
-    s = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
-    if not s:
-        raise SiteError(f"Cannot derive a file name from {name!r}; pass --slug.")
-    return s
-
 
 def _write(path: Path, text: str, force: bool, log: list[str]) -> None:
     if path.exists() and not force:
@@ -129,11 +122,6 @@ def _png_size(path: Path) -> tuple[int, int] | None:
     return struct.unpack(">II", data[16:24])
 
 
-def _starter_files() -> list[str]:
-    """Typography and fonts that `new` copies once; afterwards they belong to the project."""
-    return [TYPOGRAPHY, *(f"{FONTS}/{p.name}" for p in sorted((SITE / FONTS).iterdir()))]
-
-
 def _managed_files(with_mkdocstrings: bool) -> list[str]:
     """Files kept identical to the skill's copy (refreshed by `sync`)."""
     return [ES_JINJA] if with_mkdocstrings else []
@@ -141,6 +129,17 @@ def _managed_files(with_mkdocstrings: bool) -> list[str]:
 
 def _uses_mkdocstrings(cfg: dict) -> bool:
     return "mkdocstrings" in cfg.get("project", {}).get("plugins", {})
+
+
+def _techsical(cfg: dict) -> dict:
+    """The site's [project.extra.techsical] table."""
+    return cfg.get("project", {}).get("extra", {}).get("techsical", {}) or {}
+
+
+def _site_color(cfg: dict) -> str:
+    """Colour of the browser bar, as techsical-head.html picks it."""
+    tx = _techsical(cfg)
+    return str(tx.get("theme_color") or tx.get("primary") or DEFAULT_PRIMARY)
 
 
 def update_agents(root: Path, log: list[str]) -> None:
@@ -213,20 +212,21 @@ def _github_parts(repo_url: str) -> tuple[str, str] | None:
 
 def cmd_new(args: argparse.Namespace) -> int:
     root = Path(args.dir)
-    if not re.fullmatch(r"#[0-9a-fA-F]{6}", args.theme_color):
-        raise SiteError("--theme-color must be a #rrggbb colour.")
-    slug = args.slug or slugify(args.name)
+    for opt, val in (("--primary", args.primary), ("--accent", args.accent)):
+        if val and not re.fullmatch(r"#[0-9a-fA-F]{6}", val):
+            raise SiteError(f"{opt} must be a #rrggbb colour.")
     gh = _github_parts(args.repo_url)
     site_url = args.site_url or (f"https://{gh[0].lower()}.github.io/{gh[1]}/" if gh else "")
     if not site_url:
         raise SiteError("Pass --site-url: it can only be derived from a GitHub --repo-url.")
     logo = Path(args.logo)
+    accent = f'accent = "{args.accent.lower()}"\n' if args.accent else ""
     values = {
         "name": args.name, "description": args.description, "author": args.author,
         "site_url": site_url if site_url.endswith("/") else site_url + "/",
         "repo_url": args.repo_url, "repo_name": "/".join(gh) if gh else args.repo_url,
-        "year": str(dt.date.today().year), "theme_color": args.theme_color.lower(),
-        "slug": slug, "logo": f"logo{logo.suffix.lower()}", "package": args.package or "",
+        "year": str(dt.date.today().year), "primary": args.primary.lower(), "accent": accent,
+        "logo": f"logo{logo.suffix.lower()}", "package": args.package or "",
     }
     log: list[str] = []
     toml = _render("zensical.toml.tmpl", values)
@@ -236,10 +236,7 @@ def cmd_new(args: argparse.Namespace) -> int:
     _write(root / "zensical.toml", toml, args.force, log)
     _write(root / "docs/index.md", _render("index.md.tmpl", values), args.force, log)
     _write(root / "docs/site.webmanifest", _render("site.webmanifest.tmpl", values), args.force, log)
-    _write(root / f"docs/assets/stylesheets/{slug}.css", _render("project.css.tmpl", values),
-           args.force, log)
-    _copy(SITE / MAIN, root / MAIN, args.force, log)
-    for rel in [*_starter_files(), *_managed_files(bool(args.package))]:
+    for rel in _managed_files(bool(args.package)):
         _copy(SITE / rel, root / rel, args.force, log)
     if args.gh_pages:
         _copy(SITE / WORKFLOW, root / WORKFLOW, args.force, log)
@@ -256,7 +253,7 @@ def cmd_new(args: argparse.Namespace) -> int:
         log.append(f"updated  {gi} (site/)")
     update_agents(root, log)
     print("\n".join(log))
-    deps = "zensical" + (" mkdocstrings-python mkdocs-api-autonav" if args.package else "")
+    deps = THEME + (" mkdocstrings-python mkdocs-api-autonav" if args.package else "")
     print(f"\nNext: `uv add --dev {deps}`, then `uv run zensical build`.")
     return 0
 
@@ -318,32 +315,43 @@ def _check_toml(cfg: dict, root: Path, r: Report) -> None:
     project = cfg.get("project", {})
     theme = project.get("theme", {})
     docs = root / project.get("docs_dir", "docs")
-    if theme.get("custom_dir") != "docs_templates":
-        r.fail('[project.theme] custom_dir is not "docs_templates": docs_templates/main.html '
-               "(favicons, manifest) is ignored.")
-    if theme.get("language") != "es":
+    if theme.get("name") != THEME:
+        r.fail(f'[project.theme] name is not "{THEME}".')
+    if theme.get("language", "es") != "es":
         r.fail('[project.theme] language is not "es".')
-    css = project.get("extra_css", [])
-    tcss = TYPOGRAPHY.removeprefix("docs/")
-    if tcss in css and theme.get("font", None) is not False:
-        r.warn(f"{tcss} is loaded but [project.theme] font is not false: the theme's "
-               "Google Fonts variables override its font choices.")
-    for rel in [*css, *project.get("extra_javascript", [])]:
+    if "navigation.instant" in theme.get("features", []):
+        r.fail("[project.theme] features has navigation.instant: it swaps pages without "
+               "loading them and cancels techsical's page transitions; drop it (and "
+               "navigation.instant.prefetch).")
+    if theme.get("font", False) is not False:
+        r.warn("[project.theme] font is set: techsical serves its fonts itself; choose "
+               "other families with font_text/font_ui/font_code in [project.extra.techsical].")
+    if theme.get("palette"):
+        r.info("[project.theme] palette is set: techsical already has light, dark and system "
+               "toggles; keep it only if the project changes them.")
+    for rel in [*project.get("extra_css", []), *project.get("extra_javascript", [])]:
         if isinstance(rel, str) and not rel.startswith(("http:", "https:")) \
                 and not (docs / rel).exists():
             r.fail(f"extra_css/extra_javascript points to a missing file: docs/{rel}.")
     for key in ("favicon", "logo"):
         rel = theme.get(key)
-        if not rel:
-            r.fail(f"[project.theme] {key} is not set.")
-        elif not (docs / rel).exists():
+        if rel and not (docs / rel).exists():
             r.fail(f"[project.theme] {key} points to a missing file: docs/{rel}.")
+    if not theme.get("logo"):
+        r.fail("[project.theme] logo is not set.")
     if theme.get("favicon") and not theme["favicon"].startswith("assets/favicon/"):
-        r.warn(f"[project.theme] favicon is {theme['favicon']}; canonical: "
-               "assets/favicon/favicon-32x32.png.")
-    color = project.get("extra", {}).get("theme_color", "")
-    if not re.fullmatch(r"#[0-9a-fA-F]{6}", str(color)):
-        r.fail("[project.extra] theme_color is missing or not #rrggbb (main.html reads it).")
+        r.warn(f"[project.theme] favicon is {theme['favicon']}; techsical's default is "
+               "assets/favicon/favicon-32x32.png: drop the key.")
+    if "theme_color" in project.get("extra", {}):
+        r.fail("[project.extra] theme_color is the old main.html setting: techsical takes "
+               "the colour from [project.extra.techsical] primary (or theme_color there).")
+    tx = _techsical(cfg)
+    for key in ("primary", "accent", "primary_dark", "accent_dark", "theme_color"):
+        if key in tx and not re.fullmatch(r"#[0-9a-fA-F]{6}", str(tx[key])):
+            r.fail(f"[project.extra.techsical] {key} is not a #rrggbb colour.")
+    if "primary" not in tx:
+        r.warn("[project.extra.techsical] primary is not set: the site uses techsical's "
+               "default colour.")
     site_url = project.get("site_url", "")
     if site_url and not site_url.endswith("/"):
         r.warn("site_url should end with '/'.")
@@ -361,8 +369,9 @@ def _check_toml(cfg: dict, root: Path, r: Report) -> None:
 
 
 def _check_files(cfg: dict, root: Path, r: Report) -> None:
+    tx = _techsical(cfg)
     fav = root / "docs/assets/favicon"
-    for name, size in FAVICONS.items():
+    for name, size in FAVICONS.items() if tx.get("favicons") is not False else ():
         f = fav / name
         if not f.exists():
             r.fail(f"missing favicon: {f.relative_to(root)} (run `favicons`).")
@@ -374,59 +383,75 @@ def _check_files(cfg: dict, root: Path, r: Report) -> None:
             r.fail(f"missing managed file {rel} (run `sync`).")
         elif not filecmp.cmp(SITE / rel, f, shallow=False):
             r.fail(f"{rel} differs from the managed copy (run `sync`).")
+    if tx.get("manifest") is False:
+        return
     man = root / "docs/site.webmanifest"
     if not man.exists():
-        r.fail("missing docs/site.webmanifest.")
-    else:
-        try:
-            data = json.loads(man.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as err:
-            r.fail(f"docs/site.webmanifest is not valid JSON: {err}")
-            data = {}
-        for icon in data.get("icons", []):
-            src = icon.get("src", "")
-            if src.startswith("/"):
-                r.fail(f"manifest icon {src} is absolute; use a relative path.")
-            elif not (root / "docs" / src).exists():
-                r.fail(f"manifest icon {src} not found in docs/.")
-        color = cfg.get("project", {}).get("extra", {}).get("theme_color")
-        if color and data.get("theme_color", "").lower() != str(color).lower():
-            r.warn("manifest theme_color differs from [project.extra] theme_color.")
-        if data.get("start_url", "./") .startswith("/"):
-            r.fail("manifest start_url is absolute; use \"./\".")
-
-
-def _check_templates(root: Path, r: Report) -> None:
-    main = root / MAIN
-    if not main.exists():
-        r.fail(f"missing {MAIN}.")
+        r.fail("missing docs/site.webmanifest (or set manifest = false in "
+               "[project.extra.techsical]).")
         return
-    # main.html may extend a local page template (reCocina: main.html -> page.html ->
-    # base.html); then the head belongs to that root template, so read the local chain.
-    text, name, seen = "", "main.html", set()
+    try:
+        data = json.loads(man.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as err:
+        r.fail(f"docs/site.webmanifest is not valid JSON: {err}")
+        return
+    for icon in data.get("icons", []):
+        src = icon.get("src", "")
+        if src.startswith("/"):
+            r.fail(f"manifest icon {src} is absolute; use a relative path.")
+        elif not (root / "docs" / src).exists():
+            r.fail(f"manifest icon {src} not found in docs/.")
+    if data.get("theme_color", "").lower() != _site_color(cfg).lower():
+        r.warn(f"manifest theme_color differs from the site colour {_site_color(cfg)}.")
+    if data.get("start_url", "./").startswith("/"):
+        r.fail('manifest start_url is absolute; use "./".')
+
+
+def _template_chain(root: Path, name: str) -> str:
+    """Text of a local template and the local templates it extends."""
+    text, seen = "", set()
     while name and name not in seen and (root / "docs_templates" / name).exists():
         seen.add(name)
         part = (root / "docs_templates" / name).read_text(encoding="utf-8")
         text += part
         m = re.search(r"""{%-?\s*extends\s+['"]([^'"]+)['"]""", part)
         name = m.group(1) if m else ""
-    if not re.search(r"{%-?\s*block\s+extrahead\s*-?%}", text):
-        r.fail(f"{MAIN} (or the local template it extends) has no extrahead block "
-               "(favicons, manifest, theme colour).")
-    for link in HEAD_LINKS:
-        if not re.search(rf"""['"]{re.escape(link)}['"]\s*\|\s*url""", text):
-            r.fail(f"{MAIN} does not link {link} with a relative path (`'{link}' | url`).")
-    if "theme-color" not in text:
-        r.fail(f"{MAIN} has no theme-color meta.")
-    for path in sorted((root / "docs_templates").rglob("*.html")):
+    return text
+
+
+def _check_templates(cfg: dict, root: Path, r: Report) -> None:
+    d = root / "docs_templates"
+    overrides = [p for p in sorted(d.rglob("*.html"))
+                 if "python" not in p.relative_to(d).parts] if d.exists() else []
+    custom_dir = cfg.get("project", {}).get("theme", {}).get("custom_dir")
+    if overrides and custom_dir != "docs_templates":
+        r.fail('docs_templates/ has templates but [project.theme] custom_dir is not '
+               '"docs_templates": they are ignored.')
+    elif not overrides and custom_dir:
+        r.warn(f'[project.theme] custom_dir = "{custom_dir}" with no templates to override: '
+               "drop it (Zensical would publish the folder's other files).")
+    # main.html may extend a local page template (reCocina: main.html -> page.html).
+    head = _template_chain(root, "main.html")
+    for marker in HEAD_MARKERS:
+        if marker in head:
+            r.fail(f"docs_templates/main.html repeats techsical's head ({marker}): remove "
+                   "it, and the file if nothing else is left.")
+            break
+    if (d / "partials/icons.html").exists():
+        r.warn("docs_templates/partials/icons.html replaces techsical's head hook "
+               "(stylesheets, colours, favicons).")
+    for path in overrides:
         for m in re.finditer(r"""['"](/[^'"]*)['"]\s*\|\s*url""", path.read_text(encoding="utf-8")):
             r.fail(f"{path.relative_to(root)}: absolute path {m.group(1)} breaks the site "
                    "under a sub-path; drop the leading '/'.")
-    if not filecmp.cmp(SITE / MAIN, main, shallow=False):
-        r.info(f"{MAIN} differs from the canonical template (project blocks kept).")
+    for path in overrides:
+        r.info(f"{path.relative_to(root)} overrides a template: `upgrade` reviews it.")
 
 
 def _check_repo(cfg: dict, root: Path, r: Report) -> None:
+    py = root / "pyproject.toml"
+    if py.exists() and not re.search(r"""["']techsical\b""", py.read_text(encoding="utf-8")):
+        r.fail("pyproject.toml does not depend on techsical (`uv add --dev techsical`).")
     gi = root / ".gitignore"
     if not gi.exists() or not IGNORED_SITE & {
             ln.strip() for ln in gi.read_text(encoding="utf-8").splitlines()}:
@@ -454,148 +479,8 @@ def cmd_check(args: argparse.Namespace) -> int:
     cfg = _load_toml(root)
     _check_toml(cfg, root, r)
     _check_files(cfg, root, r)
-    _check_templates(root, r)
+    _check_templates(cfg, root, r)
     _check_repo(cfg, root, r)
-    return r.finish()
-
-
-# ---------------------------------------------------------------------------
-# measure
-# ---------------------------------------------------------------------------
-
-# Practical Typography, "summary of key rules": body text 15-25 px on the web, line
-# spacing 120-145 % of the point size, 45-90 characters per line on average.
-SIZE_PX = (15.0, 25.0)
-LEADING = (1.20, 1.45)
-MEASURE = (45.0, 90.0)
-VIEWPORTS = ((1280, 900), (1920, 1080))
-# Measured on the home page when it has no long paragraph of its own.
-PROBE = ("La tipografía de una página se juzga por su texto corrido: el tamaño de la letra, "
-         "el interlineado y la longitud de las líneas deciden si se lee con comodidad. "
-         "Este párrafo de prueba solo existe durante la medición y nunca se publica.")
-# Fonts Butterick singles out as overused defaults: a warning, never a failure.
-SYSTEM_FONTS = {"times new roman", "times", "arial", "helvetica", "calibri", "cambria",
-                "verdana", "segoe ui", "-apple-system", "system-ui", "roboto"}
-MEASURE_JS = """
-(probe) => {
-  const article = document.querySelector("article") || document.querySelector(".md-content");
-  if (!article) return [];
-  const out = [];
-  let paras = [...article.querySelectorAll("p")].filter(
-    (p) => p.textContent.replace(/\\s+/g, " ").trim().length >= 120);
-  if (!paras.length && probe) {
-    // Short pages still have a typography: measure a probe paragraph set like body text.
-    const p = document.createElement("p");
-    p.textContent = probe;
-    article.appendChild(p);
-    paras = [p];
-  }
-  for (const p of paras) {
-    if (p.closest("table, pre, nav, figure, .admonition-title, footer")) continue;
-    const text = p.textContent.replace(/\\s+/g, " ").trim();
-    const cs = getComputedStyle(p);
-    const size = parseFloat(cs.fontSize);
-    const leading = cs.lineHeight === "normal" ? NaN : parseFloat(cs.lineHeight);
-    const width = p.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-    // Average character width of this very text, set on one line in the same font.
-    const probe = document.createElement("span");
-    probe.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap";
-    probe.textContent = text;
-    p.appendChild(probe);
-    const perChar = probe.getBoundingClientRect().width / text.length;
-    probe.remove();
-    out.push({size, leading: leading / size, chars: width / perChar,
-              family: cs.fontFamily.split(",")[0].replace(/["']/g, "").trim()});
-  }
-  return out;
-}
-"""
-
-
-def _pages(site: Path, limit: int) -> list[str]:
-    """Relative URLs of the home page and the largest pages (the most text to measure)."""
-    files = [p for p in site.rglob("index.html")
-             if "assets" not in p.parts and "python" not in p.parts]
-    files.sort(key=lambda p: (p.parent != site, -p.stat().st_size))
-    rels = [p.relative_to(site).parent.as_posix() for p in files[:limit]]
-    return ["" if r == "." else r + "/" for r in rels]
-
-
-def _median(values: list[float]) -> float:
-    values = sorted(values)
-    return values[len(values) // 2]
-
-
-def cmd_measure(args: argparse.Namespace) -> int:
-    import functools
-    import http.server
-    import threading
-    try:
-        from playwright.sync_api import sync_playwright
-    except ImportError as err:
-        raise SiteError("measure needs Playwright: run with "
-                        "`uv run --with playwright python scripts/site.py measure .`.") from err
-    root = Path(args.dir).resolve()
-    site = root / _load_toml(root).get("project", {}).get("site_dir", "site")
-    if not (site / "index.html").exists():
-        raise SiteError(f"{site}/index.html not found: build the site first.")
-    class Quiet(http.server.SimpleHTTPRequestHandler):
-        def log_message(self, *args: object) -> None:
-            pass
-
-    handler = functools.partial(Quiet, directory=str(site))
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
-    base = f"http://127.0.0.1:{server.server_port}/"
-    r = Report()
-    families: set[str] = set()
-    measured = 0
-    with sync_playwright() as pw:
-        browser = None
-        for channel in ("chrome", "msedge", None):
-            try:
-                browser = pw.chromium.launch(channel=channel) if channel else pw.chromium.launch()
-                break
-            except Exception:  # noqa: BLE001 - try the next browser
-                continue
-        if browser is None:
-            raise SiteError("No browser for Playwright: install Chrome or Edge, or run "
-                            "`uv run --with playwright playwright install chromium`.")
-        for width, height in VIEWPORTS:
-            page = browser.new_page(viewport={"width": width, "height": height})
-            for rel in _pages(site, args.pages):
-                page.goto(base + rel, wait_until="load")
-                page.evaluate("document.fonts.ready")
-                rows = page.evaluate(MEASURE_JS, PROBE if rel == "" else None)
-                if not rows:
-                    continue
-                measured += 1
-                size = _median([x["size"] for x in rows])
-                lead = _median([x["leading"] for x in rows])
-                chars = _median([x["chars"] for x in rows])
-                families |= {x["family"] for x in rows}
-                where = f"/{rel} at {width}px"
-                line = f"{where}: {size:.1f} px, line spacing {lead:.0%}, {chars:.0f} characters"
-                problems = []
-                if not SIZE_PX[0] <= size <= SIZE_PX[1]:
-                    problems.append(f"size outside {SIZE_PX[0]:.0f}-{SIZE_PX[1]:.0f} px")
-                if not (LEADING[0] - 0.005) <= lead <= (LEADING[1] + 0.005):
-                    problems.append(f"line spacing outside {LEADING[0]:.0%}-{LEADING[1]:.0%}")
-                if not MEASURE[0] <= chars <= MEASURE[1]:
-                    problems.append(f"line length outside {MEASURE[0]:.0f}-{MEASURE[1]:.0f}")
-                if problems:
-                    r.fail(f"{line} ({'; '.join(problems)}).")
-                else:
-                    r.info(line)
-            page.close()
-        browser.close()
-    server.shutdown()
-    if not measured:
-        r.warn("no page has paragraphs long enough to measure.")
-    for fam in sorted(families):
-        if fam.lower() in SYSTEM_FONTS:
-            r.warn(f"body text in {fam}: Practical Typography advises against system fonts.")
-    r.info(f"body fonts: {', '.join(sorted(families)) or 'none measured'}")
     return r.finish()
 
 
@@ -609,38 +494,46 @@ def _run(cmd: list[str], root: Path) -> subprocess.CompletedProcess[str]:
 
 
 def _theme(root: Path) -> dict:
+    """Installed theme folders (techsical first, then Zensical's) and versions."""
     p = _run(["uv", "run", "--no-sync", "python", "-c", THEME_PROBE], root)
-    if p.returncode or not p.stdout.strip():
+    data = json.loads(p.stdout.strip().splitlines()[-1]) if p.stdout.strip() else {}
+    if p.returncode or "package" not in data:
         raise SiteError(f"Cannot locate the installed Zensical theme (`uv sync` first?):\n{p.stderr}")
-    return json.loads(p.stdout.strip().splitlines()[-1])
+    return data
 
 
 def _blocks(text: str) -> set[str]:
     return set(re.findall(r"{%-?\s*block\s+(\w+)", text))
 
 
-def _resolve(name: str, local: Path, theme: Path) -> Path | None:
-    """Template lookup as Zensical does it: docs_templates/ first, then the theme."""
-    for d in (local, theme):
+def _resolve(name: str, dirs: list[Path], after: Path | None = None) -> Path | None:
+    """Template lookup as Zensical does it: docs_templates/, techsical, Zensical's theme.
+
+    A template that extends its own name (`header.html` extending `header.html`)
+    continues the search in the folders after its own (``after``).
+    """
+    start = dirs.index(after) + 1 if after in dirs else 0
+    for d in dirs[start:]:
         if (d / name).exists():
             return d / name
     return None
 
 
-def _chain_blocks(name: str, local: Path, theme: Path) -> set[str]:
+def _chain_blocks(name: str, dirs: list[Path]) -> set[str]:
     """Blocks defined by a template and every template it extends."""
     found: set[str] = set()
     seen: set[Path] = set()
-    path = _resolve(name, local, theme)
+    path = _resolve(name, dirs)
     while path and path not in seen:
         seen.add(path)
         text = path.read_text(encoding="utf-8")
         found |= _blocks(text)
         m = re.search(r"""{%-?\s*extends\s+['"]([^'"]+)['"]""", text)
-        # A local template may extend the theme's template of the same name.
-        path = None if not m else (
-            theme / m.group(1) if (theme / m.group(1)).exists() and local / m.group(1) == path
-            else _resolve(m.group(1), local, theme))
+        if not m:
+            break
+        owner = next(d for d in dirs if path.is_relative_to(d))
+        path = _resolve(m.group(1), dirs, owner if m.group(1) == path.relative_to(owner).as_posix()
+                        else None)
     return found
 
 
@@ -677,32 +570,44 @@ def _overrides(root: Path) -> list[Path]:
 
 def cmd_upgrade(args: argparse.Namespace) -> int:
     root = Path(args.dir).resolve()
+    local = root / "docs_templates"
     old = _theme(root)
     snap = Path(tempfile.mkdtemp(prefix="zensical-theme-"))
-    shutil.copytree(old["dir"], snap, dirs_exist_ok=True)
+    old_dirs = []
+    for i, d in enumerate(old["dirs"]):
+        shutil.copytree(d, snap / str(i), dirs_exist_ok=True)
+        old_dirs.append(snap / str(i))
     pinned = _bump_pin(root, args.to)
     if pinned:
         print(f"pyproject.toml pinned zensical=={pinned}; pin moved.")
-    spec = f"zensical=={args.to}" if args.to else "zensical"
-    for cmd in (["uv", "lock", "--upgrade-package", spec, "--upgrade-package", "zensical-ui"],
-                ["uv", "sync"]):
+    lock = ["uv", "lock", "--upgrade-package", f"zensical=={args.to}" if args.to else "zensical",
+            "--upgrade-package", "zensical-ui"]
+    if "techsical" in old["versions"]:
+        # techsical pins a narrow Zensical range: a new Zensical comes with a new techsical.
+        lock += ["--upgrade-package", "techsical"]
+    for cmd in (lock, ["uv", "sync"]):
         p = _run(cmd, root)
         if p.returncode:
             raise SiteError(f"`{' '.join(cmd)}` failed:\n{p.stderr}")
     new = _theme(root)
-    print(f"Zensical {old['zensical']} -> {new['zensical']} "
-          f"(theme package: {old['package']} -> {new['package']})\n")
-    new_dir = Path(new["dir"])
+    for pkg in ("techsical", "zensical"):
+        if pkg in old["versions"] or pkg in new["versions"]:
+            print(f"{pkg} {old['versions'].get(pkg, '-')} -> {new['versions'].get(pkg, '-')}")
+    print(f"(Zensical theme package: {old['package']} -> {new['package']})\n")
+    new_dirs = [Path(d) for d in new["dirs"]]
     review = 0
     for ov in _overrides(root):
-        rel = ov.relative_to(root / "docs_templates").as_posix()
+        rel = ov.relative_to(local).as_posix()
         text = ov.read_text(encoding="utf-8")
-        before, after = snap / rel, new_dir / rel
+        found_before, found_after = _resolve(rel, old_dirs), _resolve(rel, new_dirs)
+        before = found_before or snap / "-" / rel
+        after = found_after or Path("/nonexistent") / rel
         extends = re.search(r"""{%-?\s*extends\s+['"]([^'"]+)['"]""", text)
         if extends:
             # A block override survives as long as every block still exists upstream.
             base = extends.group(1)
-            missing = _blocks(text) - _chain_blocks(base, root / "docs_templates", new_dir)
+            missing = _blocks(text) - _chain_blocks(
+                base, new_dirs if base == rel else [local, *new_dirs])
             if missing:
                 review += 1
                 print(f"REVIEW {rel}: blocks {sorted(missing)} no longer exist upstream.")
@@ -760,9 +665,9 @@ def main() -> int:
     n.add_argument("--author", required=True)
     n.add_argument("--repo-url", required=True)
     n.add_argument("--site-url", help="default: GitHub Pages URL derived from --repo-url")
-    n.add_argument("--theme-color", required=True, help="#rrggbb")
+    n.add_argument("--primary", required=True, help="brand colour #rrggbb (also the browser bar)")
+    n.add_argument("--accent", help="accent colour #rrggbb (default: techsical's)")
     n.add_argument("--logo", required=True, help="SVG or PNG")
-    n.add_argument("--slug", help="stylesheet name (default: from --name)")
     n.add_argument("--package", help="Python package: adds mkdocstrings and es.html.jinja")
     n.add_argument("--gh-pages", action=argparse.BooleanOptionalAction, default=True,
                    help="add .github/workflows/docs.yml (default: yes)")
@@ -774,15 +679,12 @@ def main() -> int:
     for name, hlp in (("sync", "refresh managed copies and AGENTS.md block"),
                       ("check", "compare with the canonical layout")):
         sub.add_parser(name, help=hlp).add_argument("dir")
-    m = sub.add_parser("measure", help="check the built site against Practical Typography")
-    m.add_argument("dir")
-    m.add_argument("--pages", type=int, default=12, help="pages to sample (default: 12)")
     u = sub.add_parser("upgrade", help="upgrade Zensical and review template overrides")
     u.add_argument("dir")
     u.add_argument("--to", help="target version (default: latest)")
     args = ap.parse_args()
     handler = {"new": cmd_new, "favicons": cmd_favicons, "sync": cmd_sync,
-               "check": cmd_check, "measure": cmd_measure, "upgrade": cmd_upgrade}[args.cmd]
+               "check": cmd_check, "upgrade": cmd_upgrade}[args.cmd]
     try:
         return handler(args)
     except SiteError as err:

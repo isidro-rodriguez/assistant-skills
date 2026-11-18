@@ -5,4 +5,4 @@ timeout_seconds: 900
 allowed_tools: [Read, Glob, Grep, Skill, Write, Edit, Bash]
 ---
 
-Adapta la web de documentación de tareas-cli a la estructura común de mis sitios Zensical: favicons, manifiesto, plantillas y legibilidad. No cambies lo que es propio del proyecto.
+Pasa la web de documentación de tareas-cli al tema techsical y a la estructura común de mis sitios Zensical. Conserva sus fuentes (Roboto y JetBrains Mono) y no cambies lo que es propio del proyecto.

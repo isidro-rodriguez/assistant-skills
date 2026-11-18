@@ -1,6 +1,6 @@
 schema_version: "1.1"
 name: migrate-drifted-site
 expected_outcome: |
-  The drifted site follows the canonical layout (custom_dir, favicon set, relative manifest, theme colour) and meets Practical Typography's readability ranges while keeping the project's fonts, features, palette and stylesheet; the build has no issues and nothing is committed.
+  The drifted site runs on techsical with the canonical layout (favicon set, relative manifest, colour in [project.extra.techsical], no duplicate head, no navigation.instant) while keeping the project's fonts, nav and plugins; the build has no issues and nothing is committed.
 context:
   scaffold_script: place-files.sh

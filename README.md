@@ -15,7 +15,7 @@ that read `SKILL.md` (Codex, Gemini CLI, Cursor, etc.).
 | [`typeset-pdf`](skills/typeset-pdf/SKILL.md) | Turns Markdown/HTML into a well-typeset PDF following Butterick's *Practical Typography*, as a casual document or a formal report (cover, contents, numbered headings): 75 characters per line, LaTeX math, Mermaid flowcharts, wide tables, and an automatic quality check. |
 | [`python-release`](skills/python-release/SKILL.md) | Prepares a release of a uv Python project: SemVer bump from the commits, CHANGELOG (Keep a Changelog, Spanish), version and `uv.lock`, validated by a script; never commits or tags without confirmation. |
 | [`new-python-project`](skills/new-python-project/SKILL.md) | Scaffolds a project from `acodo-template` and keeps every repo's `AGENTS.md` on one shared block of rules (`new`, `migrate`, `sync`, `check`). |
-| [`zensical-site`](skills/zensical-site/SKILL.md) | Creates, migrates, checks and upgrades a Zensical docs site on one canonical layout (`docs/`, `docs_templates/`, favicon set, manifest, GitHub Pages workflow) with self-hosted Practical Typography for the web; `upgrade` diffs overridden templates against each new theme. |
+| [`zensical-site`](skills/zensical-site/SKILL.md) | Creates, migrates, checks and upgrades a Zensical docs site on the [techsical](https://github.com/isidro-rodriguez/techsical) theme and one canonical layout (`docs/`, favicon set, manifest, Spanish mkdocstrings templates, GitHub Pages workflow); `upgrade` diffs overridden templates against each new techsical and Zensical. |
 
 ## Layout
 
