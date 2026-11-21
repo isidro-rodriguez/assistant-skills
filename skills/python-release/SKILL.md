@@ -2,9 +2,9 @@
 name: python-release
 description: Prepare a release of a uv-based Python project — choose the SemVer bump from the commits, write the CHANGELOG entries (Keep a Changelog, in Spanish), bump the version, re-lock uv.lock and propose the release commits — with a script that does the mechanical edits and validates the result. Use it whenever changes to a versioned package are about to be pushed or published, or the user says "release", "publica", "sube la versión", "bump", "prepara la versión", "actualiza el CHANGELOG" or "sube esto" in a project with pyproject.toml and CHANGELOG.md. Not for projects without a version (0.0.0 / no CHANGELOG) unless the user asks to start versioning.
 license: MIT
-compatibility: Python 3.11+ (tomllib), git, and uv for the lockfile step. Works with static [project].version and with dynamic versions read from a file ([tool.hatch.version] path), in standalone projects and uv workspace members (--project).
+compatibility: Python 3.13+, git, and uv for the lockfile step. Works with static [project].version and with dynamic versions read from a file ([tool.hatch.version] path), in standalone projects and uv workspace members (--project).
 metadata:
-  version: "0.1.0"
+  version: "0.1.1"
   author: isidro-rodriguez
 ---
 

@@ -2,9 +2,9 @@
 name: typeset-pdf
 description: Produce a well-typeset PDF (memo, letter, handout, article, or a formal report with cover, table of contents and numbered headings) from Markdown or HTML, following Matthew Butterick's Practical Typography rules — 10–12 pt body, 120–145 % line spacing, 75 characters per line, good font, curly quotes, real dashes — with LaTeX formulas, Mermaid flowcharts and wide tables, and verify the result automatically. Use when the user asks to create, generate, export, typeset or "make a nice PDF" of a document, or to convert Markdown/HTML/text into a print-ready PDF. Not for filling, merging or editing existing PDFs.
 license: MIT
-compatibility: Python 3.9+ with weasyprint, markdown, pdfplumber. For LaTeX math and Mermaid diagrams, Node.js 18+ plus `npm install` in scripts/ and Chrome/Chromium (mermaid-cli). Optional pdftoppm (poppler-utils) for the visual check. Works in any agent that can run shell commands.
+compatibility: Python 3.13+ with weasyprint, markdown, pdfplumber. For LaTeX math and Mermaid diagrams, Node.js 18+ plus `npm install` in scripts/ and Chrome/Chromium (mermaid-cli). Optional pdftoppm (poppler-utils) for the visual check. Works in any agent that can run shell commands.
 metadata:
-  version: "0.3.1"
+  version: "0.3.2"
   author: isidro-rodriguez
   source: https://practicaltypography.com
 ---

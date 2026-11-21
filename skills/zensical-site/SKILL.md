@@ -2,9 +2,9 @@
 name: zensical-site
 description: Create, migrate, check and upgrade a Zensical documentation site built on the techsical theme with one canonical layout — zensical.toml with `name = "techsical"` and `[project.extra.techsical]`, docs/ with the favicon set, logo and site.webmanifest, docs_templates/ only for overrides and the Spanish mkdocstrings templates, optional GitHub Pages workflow. Use it when the user wants documentation, a website or GitHub Pages for a project ("añade documentación", "web del proyecto", "monta Zensical"), wants an existing site moved onto techsical or the common layout, mentions favicons, webmanifest or docs_templates, or wants to update techsical or Zensical or fix a build broken by a new release (Dependabot bump, theme moved, overridden template changed).
 license: MIT
-compatibility: Python 3.11+ (tomllib) and uv. Favicons need Pillow, plus resvg-py for SVG logos (`uv run --with pillow --with resvg-py`); they don't enter the project's lock. `upgrade` needs network access (uv, PyPI).
+compatibility: Python 3.13+ and uv. Favicons need Pillow, plus resvg-py for SVG logos (`uv run --with pillow --with resvg-py`); they don't enter the project's lock. `upgrade` needs network access (uv, PyPI).
 metadata:
-  version: "0.3.1"
+  version: "0.3.2"
   author: isidro-rodriguez
 ---
 

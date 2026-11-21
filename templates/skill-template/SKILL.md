@@ -2,7 +2,7 @@
 name: skill-name
 description: One sentence on what this skill does, then when to use it — list concrete triggers (user phrases, file types, tasks). Max 1024 characters.
 license: MIT
-compatibility: List runtime requirements (e.g. Python 3.9+, packages, CLI tools). Delete if none.
+compatibility: List runtime requirements (e.g. Python 3.13+, packages, CLI tools). Delete if none.
 metadata:
   version: "0.1.0"
   author: isidro-rodriguez

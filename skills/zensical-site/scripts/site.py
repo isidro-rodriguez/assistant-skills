@@ -15,7 +15,7 @@ Subcommands:
 
 Favicon generation needs Pillow (and resvg-py for SVG logos); run it as
   uv run --with pillow --with resvg-py python scripts/site.py ...
-Everything else uses only the standard library (Python 3.11+, for tomllib).
+Everything else uses only the standard library (Python 3.13+).
 """
 
 from __future__ import annotations

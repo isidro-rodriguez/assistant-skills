@@ -26,10 +26,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-try:
-    import tomllib
-except ImportError:  # Python < 3.11
-    sys.exit("release.py needs Python 3.11+ (tomllib).")
+import tomllib
+
+if sys.version_info < (3, 13):
+    sys.exit("release.py needs Python 3.13+.")
 
 # SemVer 2.0: X.Y.Z with optional pre-release (-beta.3) and build metadata (+abc).
 SEMVER = re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$")

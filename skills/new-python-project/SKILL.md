@@ -2,9 +2,9 @@
 name: new-python-project
 description: Start a new Python project from acodo-template (uv, ruff, ty, pytest, CI, CHANGELOG, backup script) with the package renamed and an AGENTS.md built from the shared rules, or bring an existing repo's CLAUDE.md/AGENTS.md onto those shared rules and keep them in sync. Use it when the user asks to create, start or scaffold a Python project, CLI or library ("crea un proyecto", "nuevo repo Python", "inicializa con la plantilla"), or to migrate, slim down, unify or update the agent instructions (CLAUDE.md/AGENTS.md) of their Python repos.
 license: MIT
-compatibility: Python 3.11+, git; uv to lock and run the quality gate. Clones https://github.com/isidro-rodriguez/acodo-template unless --template points to a local copy.
+compatibility: Python 3.13+, git; uv to lock and run the quality gate. Clones https://github.com/isidro-rodriguez/acodo-template unless --template points to a local copy.
 metadata:
-  version: "0.3.2"
+  version: "0.3.3"
   author: isidro-rodriguez
 ---
 

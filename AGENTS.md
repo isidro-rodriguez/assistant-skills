@@ -21,7 +21,7 @@ A library of portable agent skills. Each skill must make a recurring task
   Start from `templates/skill-template/SKILL.md`.
 - **Progressive disclosure:** keep `SKILL.md` under ~500 lines; move long
   material to `references/`, one level deep (no reference chains).
-- **Scripts:** Python 3.9+, standard CLI (`--help`), deterministic, non-zero
+- **Scripts:** Python 3.13+ (no older versions), standard CLI (`--help`), deterministic, non-zero
   exit code on failure. Declare dependencies in `compatibility`.
 - **No vendor lock-in:** don't rely on tools only one assistant has unless the
   skill says so in `compatibility`.
