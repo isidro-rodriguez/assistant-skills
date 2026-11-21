@@ -253,7 +253,7 @@ def cmd_new(args: argparse.Namespace) -> int:
         log.append(f"updated  {gi} (site/)")
     update_agents(root, log)
     print("\n".join(log))
-    deps = THEME + (" mkdocstrings-python mkdocs-api-autonav" if args.package else "")
+    deps = THEME + (" mkdocstrings-python" if args.package else "")
     print(f"\nNext: `uv add --dev {deps}`, then `uv run zensical build`.")
     return 0
 
@@ -450,8 +450,12 @@ def _check_templates(cfg: dict, root: Path, r: Report) -> None:
 
 def _check_repo(cfg: dict, root: Path, r: Report) -> None:
     py = root / "pyproject.toml"
-    if py.exists() and not re.search(r"""["']techsical\b""", py.read_text(encoding="utf-8")):
+    pytext = py.read_text(encoding="utf-8") if py.exists() else ""
+    if py.exists() and not re.search(r"""["']techsical\b""", pytext):
         r.fail("pyproject.toml does not depend on techsical (`uv add --dev techsical`).")
+    if re.search(r"""["']mkdocs-api-autonav\b""", pytext):
+        r.warn("pyproject.toml depends on mkdocs-api-autonav: Zensical implements api-autonav "
+               "itself (since 0.0.66) and the package only pulls in MkDocs; remove it.")
     gi = root / ".gitignore"
     if not gi.exists() or not IGNORED_SITE & {
             ln.strip() for ln in gi.read_text(encoding="utf-8").splitlines()}:

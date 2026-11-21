@@ -4,7 +4,7 @@ description: Create, migrate, check and upgrade a Zensical documentation site bu
 license: MIT
 compatibility: Python 3.11+ (tomllib) and uv. Favicons need Pillow, plus resvg-py for SVG logos (`uv run --with pillow --with resvg-py`); they don't enter the project's lock. `upgrade` needs network access (uv, PyPI).
 metadata:
-  version: "0.3.0"
+  version: "0.3.1"
   author: isidro-rodriguez
 ---
 
@@ -55,7 +55,8 @@ leaves alone.
    ```
    It never overwrites existing files (`--force` does) and prints what it wrote.
 3. Add the tools as dev dependencies: `uv add --dev techsical` (it brings
-   `zensical`), plus `mkdocstrings-python mkdocs-api-autonav` with `--package`.
+   `zensical`), plus `mkdocstrings-python` with `--package`. Don't add
+   `mkdocs-api-autonav`: Zensical implements that plugin itself.
 4. Fill `nav` and `docs/index.md` with real content. A front page with a hero
    uses `template: home.html` (see the theme's guide, *Páginas*). Add theme
    options only when the project asks for them.
@@ -66,7 +67,8 @@ leaves alone.
 
 1. `python S/scripts/site.py check .` — the list of gaps is the work list.
 2. `uv add --dev techsical`; drop a direct `zensical` dev dependency only if
-   nothing else needs it pinned (techsical keeps a compatible range).
+   nothing else needs it pinned (techsical keeps a compatible range). Remove
+   `mkdocs-api-autonav` if present (Zensical implements it; it only pulls in MkDocs).
 3. `zensical.toml`, by hand, keeping comments and project content:
    - `[project.theme] name = "techsical"`; remove keys that only restated the old
      common setup: `language`, `font`, `favicon`, the standard `features` and
