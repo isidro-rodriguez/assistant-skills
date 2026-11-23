@@ -30,7 +30,8 @@ templates/
   skill-template/         starting point for new skills
   AGENTS.template.md      base always-on context to copy into projects
   documents/              LibreOffice Writer templates in the typeset-pdf style
-                          (documento.ott, informe.ott) and their generator
+                          (documento.ott, informe.ott), a lorem ipsum sample
+                          and their generator
 scripts/validate_skills.py  frontmatter / naming validator (also run in CI)
 ```
 

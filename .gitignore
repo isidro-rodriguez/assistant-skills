@@ -5,3 +5,4 @@ out/
 *.pdf
 !skills/**/assets/**/*.pdf
 node_modules/
+!templates/documents/muestra.pdf

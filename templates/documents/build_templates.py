@@ -2,19 +2,27 @@
 """Build the LibreOffice Writer templates with the typeset-pdf style.
 
 Translates skills/typeset-pdf/assets/base.css and report.css into Writer styles
-and writes two templates next to this script:
+and writes, next to this script:
 
   documento.ott  Charis SIL 11 pt, 132 % leading, A4 with 25/36/31/36 mm
                  margins, page number at the foot except on the first page.
-  informe.ott    The same plus the report layout: cover without a number, table
-                 of contents in roman numerals, body in arabic from 1 with the
-                 title in the header, headings numbered 1 / 1.1 / 1.1.1.
+  informe.ott    The same plus the report layout: cover without a number (logo,
+                 entity, title, subtitle, author/date/version as fields), table
+                 of contents and indexes of figures and tables in roman
+                 numerals, body in arabic from 1 with the title in the header,
+                 headings numbered 1 / 1.1 / 1.1.1, unnumbered headings and
+                 appendices.
+  muestra.odt    informe.ott filled with lorem ipsum that uses every style, and
+  muestra.pdf    its PDF, to review the templates at a glance.
 
-LibreOffice converts the generated .odt files to .ott and embeds Charis SIL,
-taken from the skill's own fonts (no need to install it). Needs LibreOffice
-(soffice) and fontconfig (Linux, macOS); run it as
+LibreOffice converts the generated .odt files and embeds Charis SIL, taken from
+the skill's own fonts (no need to install it). Needs LibreOffice (soffice) and
+fontconfig (Linux, macOS); run it as
 
-  uv run --with odfpy --with fonttools python templates/documents/build_templates.py
+  uv run --with odfpy --with fonttools --with pypdf python templates/documents/build_templates.py
+
+The sample's indexes are refreshed through LibreOffice's Python (UNO) with
+refresh_sample.py; without it the sample is still written, with empty indexes.
 """
 
 from __future__ import annotations
@@ -28,7 +36,9 @@ import tempfile
 import zipfile
 from pathlib import Path
 
+import sample
 from fontTools.ttLib import TTFont
+from odf import dc, meta
 from odf.config import ConfigItem, ConfigItemSet
 from odf.draw import Frame, TextBox
 from odf.opendocument import OpenDocumentText
@@ -54,11 +64,16 @@ from odf.style import (
 )
 from odf.text import (
     H,
+    IllustrationIndex,
+    IllustrationIndexEntryTemplate,
+    IllustrationIndexSource,
     IndexBody,
     IndexEntryChapter,
     IndexEntryPageNumber,
     IndexEntryTabStop,
     IndexEntryText,
+    IndexSourceStyle,
+    IndexSourceStyles,
     IndexTitle,
     IndexTitleTemplate,
     ListLevelStyleBullet,
@@ -68,10 +83,16 @@ from odf.text import (
     OutlineStyle,
     P,
     PageNumber,
+    Placeholder,
+    Subject,
+    TableIndex,
+    TableIndexEntryTemplate,
+    TableIndexSource,
     TableOfContent,
     TableOfContentEntryTemplate,
     TableOfContentSource,
     Title,
+    UserDefined,
 )
 
 BODY = "Charis SIL"
@@ -79,6 +100,8 @@ MONO = "DejaVu Sans Mono"
 SIZE = 11.0  # pt
 INK = "#111111"
 GREY = "#444444"
+RULE = "#888888"
+TEXT_WIDTH = 138  # mm: 210 mm page − 2 × 36 mm margins
 
 
 def pt(value: float) -> str:
@@ -125,7 +148,7 @@ def para_style(
     return style
 
 
-def build(path: str, report: bool = False) -> None:
+def build(path: str, report: bool = False, with_sample: bool = False) -> None:
     doc = OpenDocumentText()
 
     for name, family in ((BODY, "roman"), (MONO, "modern")):
@@ -361,8 +384,94 @@ def build(path: str, report: bool = False) -> None:
         para={"textalign": "center"},
         text={"fontsize": pt(9), "color": GREY},
     )
+    # hr: a 0.5 pt grey rule, 30 % of the text width, centred, 1.5 em above and
+    # below. The paragraph is a 1 pt line so only its top border shows.
+    side = f"{TEXT_WIDTH * 0.35:g}mm"
+    para_style(
+        doc,
+        "Separador",
+        "Separador",
+        parent="Standard",
+        cls="extra",
+        para={
+            "marginleft": side,
+            "marginright": side,
+            "margintop": em(1.5),
+            "marginbottom": em(1.5),
+            "bordertop": f"0.5pt solid {RULE}",
+            "borderbottom": "none",
+            "borderleft": "none",
+            "borderright": "none",
+            "padding": "0pt",
+            "lineheight": "1pt",
+        },
+        text={"fontsize": "1pt"},
+        nextstylename="Text_20_body",
+    )
+    # .math-display: centred, never split across pages.
+    para_style(
+        doc,
+        "Formula",
+        "Fórmula",
+        parent="Standard",
+        cls="extra",
+        para={
+            "textalign": "center",
+            "margintop": em(0.6),
+            "marginbottom": em(0.9),
+            "keeptogether": "always",
+        },
+        text={"hyphenate": "false"},
+        nextstylename="Text_20_body",
+    )
+    # td.num: figures flush right (Charis SIL figures are already tabular).
+    para_style(
+        doc,
+        "Tabla_20_cifras",
+        "Tabla: cifras",
+        parent="Table_20_Contents",
+        cls="extra",
+        para={"textalign": "end"},
+    )
+    para_style(
+        doc,
+        "Tabla_20_cabecera_20_cifras",
+        "Tabla: cabecera de cifras",
+        parent="Table_20_Heading",
+        cls="extra",
+        para={"textalign": "end"},
+    )
+    para_style(
+        doc,
+        "Bibliography_20_1",
+        "Bibliography 1",
+        parent="Standard",
+        cls="index",
+        para={
+            "marginleft": em(1.5),
+            "textindent": em(-1.5),
+            "marginbottom": em(0.3),
+            "textalign": "start",
+        },
+    )
+    # Like Heading 1 but outside the outline, so it is never numbered; the
+    # report's table of contents still lists it.
+    para_style(
+        doc,
+        "Titulo_20_sin_20_numero",
+        "Título sin número",
+        parent="Heading",
+        para={
+            "margintop": em(1.6),
+            "marginbottom": em(0.5),
+            **fixed(SIZE * 1.15, 1.2),
+        },
+        text={"fontsize": em(1.15), "fontweight": "bold"},
+        nextstylename="Text_20_body",
+    )
 
     # ---- Character styles ----
+    # Writer drops letter-spacing in em, so it is given in points of the body size.
     for name, display, text in (
         ("Emphasis", "Emphasis", {"fontstyle": "italic"}),
         ("Strong_20_Emphasis", "Strong Emphasis", {"fontweight": "bold"}),
@@ -380,14 +489,20 @@ def build(path: str, report: bool = False) -> None:
         (
             "Versalitas",
             "Versalitas",
-            {"fontvariant": "small-caps", "letterspacing": "0.06em"},
+            {"fontvariant": "small-caps", "letterspacing": pt(0.06 * SIZE)},
+        ),
+        # .caps, abbr: 5–12 % extra tracking for runs of capitals.
+        (
+            "Mayusculas_20_espaciadas",
+            "Mayúsculas espaciadas",
+            {"letterspacing": pt(0.08 * SIZE)},
         ),
     ):
         style = Style(name=name, family="text", displayname=display)
         style.addElement(TextProperties(**text))
         doc.styles.addElement(style)
 
-    # ---- Lists: 1.4 em indent ----
+    # ---- Lists: 1.4 em indent; bullets from Charis SIL, not OpenSymbol ----
     bullets = ListStyle(name="List_20_1", displayname="List 1")
     numbers = ListStyle(name="Numbering_20_123", displayname="Numbering 123")
     for level in range(1, 4):
@@ -406,6 +521,8 @@ def build(path: str, report: bool = False) -> None:
                 )
             )
             item.addElement(props)
+            if parent is bullets:
+                item.addElement(TextProperties(fontname=BODY))
             parent.addElement(item)
     doc.styles.addElement(bullets)
     doc.styles.addElement(numbers)
@@ -437,19 +554,26 @@ def build(path: str, report: bool = False) -> None:
     # ---- Page: A4, text block slightly above centre ----
     # 31 mm from the page edge to the text; on numbered pages that is an 18 mm
     # margin + 8 mm spacing + a 5 mm footer.
+    # Landscape pages (for tables too wide for the 138 mm column, like
+    # table.wide in the PDF) keep the vertical margins and use 25 mm at the sides.
     def page_layout(
-        name: str, bottom: str, footer: bool, header: bool = False, numbers: str = "1"
+        name: str,
+        bottom: str,
+        footer: bool,
+        header: bool = False,
+        numbers: str = "1",
+        landscape: bool = False,
     ) -> PageLayout:
         layout = PageLayout(name=name)
         layout.addElement(
             PageLayoutProperties(
-                pagewidth="210mm",
-                pageheight="297mm",
-                printorientation="portrait",
+                pagewidth="297mm" if landscape else "210mm",
+                pageheight="210mm" if landscape else "297mm",
+                printorientation="landscape" if landscape else "portrait",
                 margintop="17mm" if header else "25mm",
                 marginbottom=bottom,
-                marginleft="36mm",
-                marginright="36mm",
+                marginleft="25mm" if landscape else "36mm",
+                marginright="25mm" if landscape else "36mm",
                 numformat=numbers,
             )
         )
@@ -477,6 +601,10 @@ def build(path: str, report: bool = False) -> None:
 
     if report:
         build_report_pages(doc, page_layout, page_footer)
+        if with_sample:
+            sample.add(doc)
+        else:
+            doc.text.addElement(P(stylename="Text_20_body", text=""))
     else:
         first = MasterPage(
             name="First_20_Page",
@@ -490,6 +618,13 @@ def build(path: str, report: bool = False) -> None:
         )
         page_footer(standard)
         doc.masterstyles.addElement(standard)
+        landscape = MasterPage(
+            name="Apaisada",
+            displayname="Apaisada",
+            pagelayoutname=page_layout("pm3", "18mm", True, landscape=True),
+        )
+        page_footer(landscape)
+        doc.masterstyles.addElement(landscape)
         # The first paragraph starts on "First Page": no page number, as in the PDF.
         start = Style(
             name="P1",
@@ -514,7 +649,7 @@ def build(path: str, report: bool = False) -> None:
 
 
 def build_report_pages(doc, page_layout, page_footer) -> None:
-    """Report cover, table of contents and body, with their page and paragraph styles."""
+    """Report cover, front matter and body, with their page and paragraph styles."""
     cover = MasterPage(
         name="Portada",
         displayname="Portada",
@@ -526,19 +661,22 @@ def build_report_pages(doc, page_layout, page_footer) -> None:
         pagelayoutname=page_layout("pm2", "18mm", True, numbers="i"),
     )
     page_footer(front)
-    main = MasterPage(
-        name="Cuerpo",
-        displayname="Cuerpo",
-        pagelayoutname=page_layout("pm3", "18mm", True, header=True),
-    )
-    header = Header()
-    # The document title (File > Properties > Title) in the running header.
-    running = P(stylename="Header")
-    running.addElement(Title())
-    header.addElement(running)
-    main.addElement(header)
-    page_footer(main)
-    for master in (cover, front, main):
+    masters = [cover, front]
+    # Body and landscape pages carry the document title (File > Properties >
+    # Title) in the running header.
+    for name, layout in (
+        ("Cuerpo", page_layout("pm3", "18mm", True, header=True)),
+        ("Apaisada", page_layout("pm4", "18mm", True, header=True, landscape=True)),
+    ):
+        master = MasterPage(name=name, displayname=name, pagelayoutname=layout)
+        header = Header()
+        running = P(stylename="Header")
+        running.addElement(Title())
+        header.addElement(running)
+        master.addElement(header)
+        page_footer(master)
+        masters.append(master)
+    for master in masters:
         doc.masterstyles.addElement(master)
 
     para_style(
@@ -549,6 +687,15 @@ def build_report_pages(doc, page_layout, page_footer) -> None:
         cls="extra",
         para={"textalign": "end"},
         text={"fontsize": pt(9), "fontstyle": "italic", "color": GREY},
+    )
+    # .cover-logo: up to 22 mm high, 8 mm above the entity.
+    para_style(
+        doc,
+        "Portada_20_logo",
+        "Portada: logotipo",
+        parent="Standard",
+        cls="chapter",
+        para={"marginbottom": "8mm"},
     )
     para_style(
         doc,
@@ -603,8 +750,27 @@ def build_report_pages(doc, page_layout, page_footer) -> None:
         para={"margintop": "0pt", "marginbottom": em(0.5), **fixed(SIZE * 1.15, 1.2)},
         text={"fontsize": em(1.15)},
     )
+    # Titles of the indexes that follow the table of contents on its page.
+    para_style(
+        doc,
+        "Titulo_20_de_20_indice",
+        "Título de índice",
+        parent="Contents_20_Heading",
+        cls="index",
+        para={"margintop": em(2.2)},
+    )
+    # Appendix heading: unnumbered (write "Anexo A. …"), on a new page, listed
+    # in the table of contents at level 1.
+    para_style(
+        doc,
+        "Anexo",
+        "Anexo",
+        parent="Titulo_20_sin_20_numero",
+        para={"breakbefore": "page", "margintop": "0pt"},
+        nextstylename="Text_20_body",
+    )
     # Table of contents: number in a 2.2 em column, page number flush right.
-    text_width = "138mm"
+    text_width = f"{TEXT_WIDTH}mm"
     for level, indent, bold in ((1, "0pt", True), (2, em(2.2), False)):
         style = Style(
             name=f"Contents_20_{level}",
@@ -622,6 +788,24 @@ def build_report_pages(doc, page_layout, page_footer) -> None:
         props.addElement(tabs)
         style.addElement(props)
         style.addElement(TextProperties(fontweight="bold" if bold else "normal"))
+        doc.styles.addElement(style)
+    # Indexes of figures and tables: caption text, page number flush right.
+    for name, display in (
+        ("Illustration_20_Index_20_1", "Illustration Index 1"),
+        ("Table_20_index_20_1", "Table index 1"),
+    ):
+        style = Style(
+            name=name,
+            family="paragraph",
+            displayname=display,
+            parentstylename="Standard",
+            attributes={"class": "index"},
+        )
+        props = ParagraphProperties(marginbottom=em(0.2))
+        tabs = TabStops()
+        tabs.addElement(TabStop(position=text_width, type="right", leaderstyle="none"))
+        props.addElement(tabs)
+        style.addElement(props)
         doc.styles.addElement(style)
 
     # Frame at the foot of the cover for author, date and version.
@@ -655,31 +839,58 @@ def build_report_pages(doc, page_layout, page_footer) -> None:
         doc.automaticstyles.addElement(style)
         return style
 
+    # Cover data lives in File > Properties: Title and Subject (Description tab)
+    # and the custom properties below; the cover shows them as fields.
+    doc.meta.addElement(dc.Title(text="Título del informe"))
+    doc.meta.addElement(dc.Subject(text="Subtítulo del informe"))
+    fields = {
+        "Entidad": "Entidad o empresa",
+        "Autor": "Autor",
+        "Fecha": "Fecha",
+        "Versión": "1.0",
+    }
+    for name, value in fields.items():
+        doc.meta.addElement(meta.UserDefined(name=name, valuetype="string", text=value))
+
+    def field(style: str, name: str, prefix: str = "") -> P:
+        paragraph = P(stylename=style, text=prefix)
+        paragraph.addElement(UserDefined(name=name, text=fields[name]))
+        return paragraph
+
     body = doc.text
-    first = P(
-        stylename=starts("P1", "Portada_20_entidad", "Portada", None),
-        text="Entidad o empresa",
+    # Logo: click the placeholder to insert the image; delete the paragraph if
+    # there is none.
+    logo = P(stylename=starts("P1", "Portada_20_logo", "Portada", None))
+    logo.addElement(
+        Placeholder(placeholdertype="image", description="Logotipo", text="<Logotipo>")
     )
+    body.addElement(logo)
+    entity = field("Portada_20_entidad", "Entidad")
     frame = Frame(
         stylename=frame_style,
         anchortype="paragraph",
-        width="138mm",
+        width=text_width,
         name="Datos de portada",
     )
     box = TextBox(minheight="2cm")
-    box.addElement(P(stylename="Portada_20_autor", text="Autor"))
-    box.addElement(P(stylename="Portada_20_datos", text="Fecha"))
-    box.addElement(P(stylename="Portada_20_datos", text="Versión 1.0"))
+    box.addElement(field("Portada_20_autor", "Autor"))
+    box.addElement(field("Portada_20_datos", "Fecha"))
+    box.addElement(field("Portada_20_datos", "Versión", "Versión "))
     frame.addElement(box)
-    first.addElement(frame)
-    body.addElement(first)
+    entity.addElement(frame)
+    body.addElement(entity)
     cover_title = P(stylename="Portada_20_titulo")
-    cover_title.addElement(Title())
+    cover_title.addElement(Title(text="Título del informe"))
     body.addElement(cover_title)
-    body.addElement(P(stylename="Portada_20_subtitulo", text="Subtítulo del informe"))
+    subtitle = P(stylename="Portada_20_subtitulo")
+    subtitle.addElement(Subject(text="Subtítulo del informe"))
+    body.addElement(subtitle)
 
+    hint = "Actualiza el índice: clic derecho > Actualizar índice"
     toc = TableOfContent(name="Índice", protected="true")
-    source = TableOfContentSource(outlinelevel="2", useoutlinelevel="true")
+    source = TableOfContentSource(
+        outlinelevel="2", useoutlinelevel="true", useindexsourcestyles="true"
+    )
     title_template = IndexTitleTemplate(stylename="Contents_20_Heading")
     title_template.addText("Índice")
     source.addElement(title_template)
@@ -695,6 +906,10 @@ def build_report_pages(doc, page_layout, page_footer) -> None:
         entry.addElement(IndexEntryTabStop(type="right", leaderchar=" "))
         entry.addElement(IndexEntryPageNumber())
         source.addElement(entry)
+    extra = IndexSourceStyles(outlinelevel="1")
+    for name in ("Titulo_20_sin_20_numero", "Anexo"):
+        extra.addElement(IndexSourceStyle(stylename=name))
+    source.addElement(extra)
     toc.addElement(source)
     index_body = IndexBody()
     index_title = IndexTitle(name="Índice_Head")
@@ -705,14 +920,55 @@ def build_report_pages(doc, page_layout, page_footer) -> None:
         )
     )
     index_body.addElement(index_title)
-    index_body.addElement(
-        P(
-            stylename="Contents_20_1",
-            text="Actualiza el índice: clic derecho > Actualizar índice",
-        )
-    )
+    index_body.addElement(P(stylename="Contents_20_1", text=hint))
     toc.addElement(index_body)
     body.addElement(toc)
+
+    # Indexes of figures and tables, from the captions (Insert > Caption with
+    # the Figura and Tabla categories). Delete the one a report does not need.
+    for kind, title, sequence, entry_style, cls in (
+        (
+            "figuras",
+            "Índice de figuras",
+            "Figure",
+            "Illustration_20_Index_20_1",
+            (
+                IllustrationIndex,
+                IllustrationIndexSource,
+                IllustrationIndexEntryTemplate,
+            ),
+        ),
+        (
+            "tablas",
+            "Índice de tablas",
+            "Table",
+            "Table_20_index_20_1",
+            (TableIndex, TableIndexSource, TableIndexEntryTemplate),
+        ),
+    ):
+        index_cls, source_cls, entry_cls = cls
+        index = index_cls(name=title, protected="true")
+        source = source_cls(
+            captionsequencename=sequence,
+            captionsequenceformat="text",
+            usecaption="true",
+        )
+        title_template = IndexTitleTemplate(stylename="Titulo_20_de_20_indice")
+        title_template.addText(title)
+        source.addElement(title_template)
+        entry = entry_cls(stylename=entry_style)
+        entry.addElement(IndexEntryText())
+        entry.addElement(IndexEntryTabStop(type="right", leaderchar=" "))
+        entry.addElement(IndexEntryPageNumber())
+        source.addElement(entry)
+        index.addElement(source)
+        index_body = IndexBody()
+        index_title = IndexTitle(name=f"{title}_Head")
+        index_title.addElement(P(stylename="Titulo_20_de_20_indice", text=title))
+        index_body.addElement(index_title)
+        index_body.addElement(P(stylename=entry_style, text=hint))
+        index.addElement(index_body)
+        body.addElement(index)
 
     body.addElement(
         H(
@@ -721,12 +977,18 @@ def build_report_pages(doc, page_layout, page_footer) -> None:
             text="Introducción",
         )
     )
-    body.addElement(P(stylename="Text_20_body", text=""))
 
 
 ROOT = Path(__file__).resolve().parents[2]
 FONTS = ROOT / "skills/typeset-pdf/assets/fonts"
-TEMPLATES = {"documento": False, "informe": True}
+REFRESH = Path(__file__).resolve().parent / "refresh_sample.py"
+# name: (report layout, lorem ipsum sample, LibreOffice export filter)
+TARGETS = {
+    "documento": (False, False, "ott:writer8_template"),
+    "informe": (True, False, "ott:writer8_template"),
+    "muestra": (True, True, "odt:writer8"),
+}
+ALLOWED_FONTS = ("CharisSIL", "Charis SIL", "DejaVuSansMono", "DejaVu Sans Mono")
 FONTCONFIG = """<?xml version="1.0"?>
 <!DOCTYPE fontconfig SYSTEM "fonts.dtd">
 <fontconfig>
@@ -755,22 +1017,11 @@ def _prepare_fonts(work: Path) -> Path:
     return config
 
 
-def _convert(soffice: str, sources: list[Path], work: Path, config: Path) -> None:
-    """Save the .odt files as .ott with LibreOffice, which embeds the fonts."""
+def _soffice(soffice: str, work: Path, config: Path, *args: str) -> None:
+    """Run headless LibreOffice with an isolated profile (works with it open)."""
     env = {**os.environ, "FONTCONFIG_FILE": str(config)}
-    profile = (
-        work / "profile"
-    ).as_uri()  # isolated profile: works with LibreOffice open
-    command = [
-        soffice,
-        f"-env:UserInstallation={profile}",
-        "--headless",
-        "--convert-to",
-        "ott:writer8_template",
-        "--outdir",
-        str(work / "out"),
-        *map(str, sources),
-    ]
+    profile = (work / "profile").as_uri()
+    command = [soffice, f"-env:UserInstallation={profile}", "--headless", *args]
     result = subprocess.run(
         command, check=False, env=env, capture_output=True, text=True, timeout=300
     )
@@ -778,8 +1029,71 @@ def _convert(soffice: str, sources: list[Path], work: Path, config: Path) -> Non
         raise SystemExit(f"soffice failed:\n{result.stderr}")
 
 
-def _check(template: Path) -> None:
-    """Fail unless the template embeds the four Charis SIL styles."""
+def _uno_python(soffice: str) -> str | None:
+    """A Python that can import uno: LibreOffice's own, or the system one."""
+    program = Path(shutil.which(soffice) or soffice).resolve().parent
+    candidates = [
+        program / "python",  # Windows
+        program.parent / "Resources/python",  # macOS app bundle
+        Path("/usr/bin/python3"),  # Linux packages (python3-uno)
+    ]
+    for candidate in candidates:
+        if candidate.is_file():
+            probe = subprocess.run(
+                [str(candidate), "-c", "import uno"], capture_output=True, check=False
+            )
+            if probe.returncode == 0:
+                return str(candidate)
+    return None
+
+
+def _render_sample(soffice: str, work: Path, config: Path) -> tuple[Path, Path]:
+    """Refresh the sample's indexes and export it to PDF."""
+    odt = work / "out" / "muestra.odt"
+    pdf = work / "out" / "muestra.pdf"
+    python = _uno_python(soffice)
+    if python is None:
+        print(
+            "warning: no Python with LibreOffice's uno module; "
+            "the sample's indexes are left empty",
+            file=sys.stderr,
+        )
+        _soffice(
+            soffice,
+            work,
+            config,
+            "--convert-to",
+            "pdf",
+            "--outdir",
+            str(work / "out"),
+            str(odt),
+        )
+        return odt, pdf
+    env = {**os.environ, "FONTCONFIG_FILE": str(config)}
+    result = subprocess.run(
+        [
+            python,
+            str(REFRESH),
+            "--soffice",
+            soffice,
+            "--profile",
+            str(work / "uno-profile"),
+            str(odt),
+            str(pdf),
+        ],
+        check=False,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+    if result.returncode:
+        raise SystemExit(f"refresh_sample.py failed:\n{result.stderr}")
+    return odt, pdf
+
+
+def _check_template(template: Path) -> None:
+    """Fail unless the file embeds the four Charis SIL styles and the new styles."""
     with zipfile.ZipFile(template) as archive:
         embedded = [
             n for n in archive.namelist() if n.startswith("Fonts/Font_Charis_SIL")
@@ -789,8 +1103,39 @@ def _check(template: Path) -> None:
         raise SystemExit(
             f"{template.name}: {len(embedded)} Charis SIL fonts embedded, expected 4."
         )
-    if 'style:name="Text_20_body"' not in styles:
-        raise SystemExit(f"{template.name}: Body Text style missing.")
+    for needed in (
+        'style:name="Text_20_body"',
+        'style:name="Mayúsculas_20_espaciadas"',
+        'style:name="Apaisada"',
+    ):
+        if needed not in styles:
+            raise SystemExit(f"{template.name}: {needed} missing from styles.xml.")
+    if 'fo:font-variant="small-caps" fo:letter-spacing=' not in styles:
+        raise SystemExit(f"{template.name}: small caps lost their letter-spacing.")
+
+
+def _check_pdf(pdf: Path) -> None:
+    """The sample PDF: A4 pages (one landscape) set only in Charis SIL and the mono."""
+    from pypdf import PdfReader
+
+    reader = PdfReader(pdf)
+    sizes = {
+        (round(float(p.mediabox.width)), round(float(p.mediabox.height)))
+        for p in reader.pages
+    }
+    if not {(595, 842), (842, 595)} <= sizes:
+        raise SystemExit(
+            f"{pdf.name}: page sizes {sizes}, expected A4 portrait and landscape."
+        )
+    fonts = set()
+    for page in reader.pages:
+        resources = page.get("/Resources") or {}
+        for font in (resources.get("/Font") or {}).values():
+            fonts.add(str(font.get_object().get("/BaseFont", "")).split("+")[-1])
+    stray = {f for f in fonts if not f.lstrip("/").startswith(ALLOWED_FONTS)}
+    if stray:
+        raise SystemExit(f"{pdf.name}: unexpected fonts {sorted(stray)}.")
+    print(f"checked {pdf.name}: {len(reader.pages)} pages, fonts {sorted(fonts)}")
 
 
 def main() -> int:
@@ -810,18 +1155,39 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="templates-") as tmp:
         work = Path(tmp)
         config = _prepare_fonts(work)
-        sources = []
-        for name, report in TEMPLATES.items():
+        by_filter: dict[str, list[Path]] = {}
+        for name, (report, with_sample, export) in TARGETS.items():
             source = work / f"{name}.odt"
-            build(str(source), report=report)
-            sources.append(source)
-        _convert(args.soffice, sources, work, config)
+            if export.startswith("odt"):  # same name as the output: keep apart
+                source = work / "src" / f"{name}.odt"
+                source.parent.mkdir(exist_ok=True)
+            build(str(source), report=report, with_sample=with_sample)
+            by_filter.setdefault(export, []).append(source)
+        for export, sources in by_filter.items():
+            _soffice(
+                args.soffice,
+                work,
+                config,
+                "--convert-to",
+                export,
+                "--outdir",
+                str(work / "out"),
+                *map(str, sources),
+            )
+        outputs = []
+        for name, (_, with_sample, export) in TARGETS.items():
+            produced = work / "out" / f"{name}.{export[:3]}"
+            _check_template(produced)
+            outputs.append(produced)
+            if with_sample:
+                _, pdf = _render_sample(args.soffice, work, config)
+                _check_template(produced)
+                _check_pdf(pdf)
+                outputs.append(pdf)
         args.out.mkdir(parents=True, exist_ok=True)
-        for name in TEMPLATES:
-            template = work / "out" / f"{name}.ott"
-            _check(template)
-            shutil.copy2(template, args.out / template.name)
-            print(f"wrote {args.out / template.name}")
+        for produced in outputs:
+            shutil.copy2(produced, args.out / produced.name)
+            print(f"wrote {args.out / produced.name}")
     return 0
 
 
