@@ -4,7 +4,7 @@ description: Produce a well-typeset PDF (memo, letter, handout, article, or a fo
 license: MIT
 compatibility: Python 3.13+ with weasyprint, markdown, pdfplumber. For LaTeX math and Mermaid diagrams, Node.js 18+ plus `npm install` in scripts/ and Chrome/Chromium (mermaid-cli). Optional pdftoppm (poppler-utils) for the visual check. Works in any agent that can run shell commands.
 metadata:
-  version: "0.3.2"
+  version: "0.3.3"
   author: isidro-rodriguez
   source: https://practicaltypography.com
 ---
@@ -28,6 +28,11 @@ rules, and proves it with a measurement script before delivery.
 | Report cover data | report only | Whatever the user gave: `title`, `subtitle`, `author`, `organization`, `date`, `version`, `logo` |
 
 Ask only if the content itself is missing. Everything else has a default.
+
+When the user asks for example, sample or test sections ("escribe unos apartados de
+ejemplo", "a test report"), fill them with lorem ipsum, not with invented subject matter:
+made-up incidents, faults or findings read as real and distract from the layout being
+reviewed.
 
 ### Document types
 

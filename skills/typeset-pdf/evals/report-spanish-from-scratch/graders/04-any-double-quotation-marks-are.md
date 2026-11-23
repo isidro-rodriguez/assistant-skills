@@ -4,4 +4,4 @@ focus: trace
 weight: 1
 ---
 
-Any double quotation marks are « » and the text is in Spanish
+Any double quotation marks are « », the body sections are filled with lorem ipsum, and the fixed texts (cover labels, 'Índice') are in Spanish

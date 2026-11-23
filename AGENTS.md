@@ -31,6 +31,10 @@ A library of portable agent skills. Each skill must make a recurring task
   This is the skill-creator layout, also run by `claude plugin eval`. Input
   files go in the case's `files/` with a `place-files.sh`. Copy
   `templates/skill-template/evals/example-case/`.
+- **Filler content:** sample documents, eval input files and any placeholder text use
+  lorem ipsum, not invented realistic content (incidents, faults, findings): it reads as
+  real and is unpleasant out of context. Keep the structure the test needs (headings,
+  tables, quotes, formulas) and fill the words with lorem ipsum.
 
 ## Creating or improving a skill
 
