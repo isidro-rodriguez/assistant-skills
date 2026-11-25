@@ -8,11 +8,16 @@ texts are in Spanish.
 | File | Contents |
 |---|---|
 | `documento.ott` | Charis SIL 11 pt, 132 % leading (14.5 pt minimum), A4 with 25/36/31/36 mm margins, justified text with hyphenation, page number at the foot except on the first page. Title, subtitle, three heading levels, quotations, code, formulas, captions, footnotes, lists, table, bibliography and separator styles, plus "Texto con sangría" (first-line indents instead of paragraph space) and an "Apaisada" landscape page. |
-| `informe.ott` | The same plus the report layout: cover without a number (logo, entity, title, subtitle, author/date/version), table of contents and indexes of figures and tables in roman numerals, body in arabic numerals from 1 with the title in the header, headings numbered 1 / 1.1 / 1.1.1 with hanging numbers, unnumbered headings and appendices. |
+| `informe.ott` | The same plus the report layout: cover without a number (logo, entity, title, subtitle, author/date/version), table of contents (three levels, linked entries, dotted leaders) and indexes of figures and tables in roman numerals, body in arabic numerals from 1 with the title at the right of the header and the current chapter and page number in the footer, each first-level heading on a new page, headings numbered 1. / 1.1. / 1.1.1. with hanging numbers, unnumbered headings and appendices. |
 | `muestra.odt`, `muestra.pdf` | `informe.ott` filled with lorem ipsum that uses every style: open the PDF to see what the templates produce. |
 
 Charis SIL is embedded, so the templates look the same where it is not
 installed.
+
+Both templates draw a thin rule under first-level headings. That rule, the
+chapter-per-page breaks, the dotted leaders, the periods after heading numbers
+and the chapter name in the footer come from the maintainer's 2013 report
+template and are deliberate differences from `typeset-pdf`.
 
 ## Styles beyond the defaults
 

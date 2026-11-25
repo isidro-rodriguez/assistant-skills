@@ -63,12 +63,15 @@ from odf.style import (
     TextProperties,
 )
 from odf.text import (
+    Chapter,
     H,
     IllustrationIndex,
     IllustrationIndexEntryTemplate,
     IllustrationIndexSource,
     IndexBody,
     IndexEntryChapter,
+    IndexEntryLinkEnd,
+    IndexEntryLinkStart,
     IndexEntryPageNumber,
     IndexEntryTabStop,
     IndexEntryText,
@@ -85,6 +88,7 @@ from odf.text import (
     PageNumber,
     Placeholder,
     Subject,
+    Tab,
     TableIndex,
     TableIndexEntryTemplate,
     TableIndexSource,
@@ -102,6 +106,18 @@ INK = "#111111"
 GREY = "#444444"
 RULE = "#888888"
 TEXT_WIDTH = 138  # mm: 210 mm page − 2 × 36 mm margins
+LANDSCAPE_WIDTH = 247  # mm: 297 mm page − 2 × 25 mm margins
+# Thin rule under first-level headings, as in the 2013 report template.
+CHAPTER_RULE = {
+    "borderbottom": f"0.5pt solid {GREY}",
+    "bordertop": "none",
+    "borderleft": "none",
+    "borderright": "none",
+    "paddingbottom": "2pt",
+}
+# Report heading numbers end in a period (1. / 1.1. / 1.1.1.) and hang in a
+# column this wide; the table of contents uses the same columns.
+NUMBER_COLUMNS = (2.2, 2.8, 3.4)  # em
 
 
 def pt(value: float) -> str:
@@ -268,16 +284,21 @@ def build(path: str, report: bool = False, with_sample: bool = False) -> None:
         ),
     )
     for level, scale, before, after, text in headings:
+        para = {
+            "margintop": before,
+            "marginbottom": after,
+            **fixed(SIZE * scale, 1.2),
+        }
+        if level == 1:
+            para |= CHAPTER_RULE
+            if report:  # each chapter on a new page
+                para |= {"breakbefore": "page"}
         para_style(
             doc,
             f"Heading_20_{level}",
             f"Heading {level}",
             parent="Heading",
-            para={
-                "margintop": before,
-                "marginbottom": after,
-                **fixed(SIZE * scale, 1.2),
-            },
+            para=para,
             text={"fontsize": em(scale), **text},
             defaultoutlinelevel=str(level),
             nextstylename="Text_20_body",
@@ -465,6 +486,8 @@ def build(path: str, report: bool = False, with_sample: bool = False) -> None:
             "margintop": em(1.6),
             "marginbottom": em(0.5),
             **fixed(SIZE * 1.15, 1.2),
+            **CHAPTER_RULE,
+            **({"breakbefore": "page"} if report else {}),
         },
         text={"fontsize": em(1.15), "fontweight": "bold"},
         nextstylename="Text_20_body",
@@ -527,14 +550,14 @@ def build(path: str, report: bool = False, with_sample: bool = False) -> None:
     doc.styles.addElement(bullets)
     doc.styles.addElement(numbers)
 
-    # Unnumbered headings; the report numbers 1 / 1.1 / 1.1.1 with hanging numbers
-    # (text aligned at 2.2 / 2.6 / 3.0 em, like .secnum in report.css).
+    # Unnumbered headings; the report numbers 1. / 1.1. / 1.1.1. with hanging
+    # numbers (text aligned at 2.2 / 2.8 / 3.4 em).
     outline = OutlineStyle(name="Outline")
     for level in range(1, 11):
         if report and level <= 3:
-            width = em((2.2, 2.6, 3.0)[level - 1])
+            width = em(NUMBER_COLUMNS[level - 1])
             item = OutlineLevelStyle(
-                level=level, numformat="1", displaylevels=str(level)
+                level=level, numformat="1", numsuffix=".", displaylevels=str(level)
             )
             props = ListLevelProperties(listlevelpositionandspacemode="label-alignment")
             props.addElement(
@@ -592,11 +615,15 @@ def build(path: str, report: bool = False, with_sample: bool = False) -> None:
         doc.automaticstyles.addElement(layout)
         return layout
 
-    def page_footer(master: MasterPage) -> None:
+    def page_footer(master: MasterPage, chapter_style: str | None = None) -> None:
+        """Page number centred, or chapter name left and page number right."""
         footer = Footer()
-        number = P(stylename="Footer")
-        number.addElement(PageNumber(selectpage="current"))
-        footer.addElement(number)
+        line = P(stylename=chapter_style or "Footer")
+        if chapter_style:
+            line.addElement(Chapter(display="name", outlinelevel="1"))
+            line.addElement(Tab())
+        line.addElement(PageNumber(selectpage="current"))
+        footer.addElement(line)
         master.addElement(footer)
 
     if report:
@@ -648,8 +675,19 @@ def build(path: str, report: bool = False, with_sample: bool = False) -> None:
     doc.save(path)
 
 
+def dotted_tab(position: str) -> TabStop:
+    """Right tab with dotted leaders, for index entries."""
+    return TabStop(
+        position=position, type="right", leaderstyle="dotted", leadertext="."
+    )
+
+
 def build_report_pages(doc, page_layout, page_footer) -> None:
     """Report cover, front matter and body, with their page and paragraph styles."""
+    # Index entries are links to their headings, without link colour.
+    link = Style(name="Index_20_Link", family="text", displayname="Index Link")
+    link.addElement(TextProperties())
+    doc.styles.addElement(link)
     cover = MasterPage(
         name="Portada",
         displayname="Portada",
@@ -663,10 +701,15 @@ def build_report_pages(doc, page_layout, page_footer) -> None:
     page_footer(front)
     masters = [cover, front]
     # Body and landscape pages carry the document title (File > Properties >
-    # Title) in the running header.
-    for name, layout in (
-        ("Cuerpo", page_layout("pm3", "18mm", True, header=True)),
-        ("Apaisada", page_layout("pm4", "18mm", True, header=True, landscape=True)),
+    # Title) at the right of the header, and the current chapter (Heading 1) at
+    # the left of the footer with the page number at the right.
+    for name, layout, width in (
+        ("Cuerpo", page_layout("pm3", "18mm", True, header=True), TEXT_WIDTH),
+        (
+            "Apaisada",
+            page_layout("pm4", "18mm", True, header=True, landscape=True),
+            LANDSCAPE_WIDTH,
+        ),
     ):
         master = MasterPage(name=name, displayname=name, pagelayoutname=layout)
         header = Header()
@@ -674,7 +717,21 @@ def build_report_pages(doc, page_layout, page_footer) -> None:
         running.addElement(Title())
         header.addElement(running)
         master.addElement(header)
-        page_footer(master)
+        footer_style = f"Pie_20_{name}"
+        style = Style(
+            name=footer_style,
+            family="paragraph",
+            displayname=f"Pie: {name.lower()}",
+            parentstylename="Footer",
+            attributes={"class": "extra"},
+        )
+        props = ParagraphProperties(textalign="start")
+        tabs = TabStops()
+        tabs.addElement(TabStop(position=f"{width}mm", type="right"))
+        props.addElement(tabs)
+        style.addElement(props)
+        doc.styles.addElement(style)
+        page_footer(master, footer_style)
         masters.append(master)
     for master in masters:
         doc.masterstyles.addElement(master)
@@ -769,9 +826,12 @@ def build_report_pages(doc, page_layout, page_footer) -> None:
         para={"breakbefore": "page", "margintop": "0pt"},
         nextstylename="Text_20_body",
     )
-    # Table of contents: number in a 2.2 em column, page number flush right.
+    # Table of contents: numbers in the headings' columns, dotted leaders to the
+    # page number flush right.
     text_width = f"{TEXT_WIDTH}mm"
-    for level, indent, bold in ((1, "0pt", True), (2, em(2.2), False)):
+    indents = ("0pt", em(NUMBER_COLUMNS[0]), em(NUMBER_COLUMNS[0] + NUMBER_COLUMNS[1]))
+    for level in (1, 2, 3):
+        indent, bold = indents[level - 1], level == 1
         style = Style(
             name=f"Contents_20_{level}",
             family="paragraph",
@@ -783,8 +843,8 @@ def build_report_pages(doc, page_layout, page_footer) -> None:
             marginleft=indent, margintop=em(0.55) if level == 1 else "0pt"
         )
         tabs = TabStops()
-        tabs.addElement(TabStop(position=em(2.2 if level == 1 else 2.6)))
-        tabs.addElement(TabStop(position=text_width, type="right", leaderstyle="none"))
+        tabs.addElement(TabStop(position=em(NUMBER_COLUMNS[level - 1])))
+        tabs.addElement(dotted_tab(text_width))
         props.addElement(tabs)
         style.addElement(props)
         style.addElement(TextProperties(fontweight="bold" if bold else "normal"))
@@ -803,7 +863,7 @@ def build_report_pages(doc, page_layout, page_footer) -> None:
         )
         props = ParagraphProperties(marginbottom=em(0.2))
         tabs = TabStops()
-        tabs.addElement(TabStop(position=text_width, type="right", leaderstyle="none"))
+        tabs.addElement(dotted_tab(text_width))
         props.addElement(tabs)
         style.addElement(props)
         doc.styles.addElement(style)
@@ -889,22 +949,24 @@ def build_report_pages(doc, page_layout, page_footer) -> None:
     hint = "Actualiza el índice: clic derecho > Actualizar índice"
     toc = TableOfContent(name="Índice", protected="true")
     source = TableOfContentSource(
-        outlinelevel="2", useoutlinelevel="true", useindexsourcestyles="true"
+        outlinelevel="3", useoutlinelevel="true", useindexsourcestyles="true"
     )
     title_template = IndexTitleTemplate(stylename="Contents_20_Heading")
     title_template.addText("Índice")
     source.addElement(title_template)
-    for level in (1, 2):
+    for level in (1, 2, 3):
         entry = TableOfContentEntryTemplate(
             outlinelevel=str(level), stylename=f"Contents_20_{level}"
         )
+        entry.addElement(IndexEntryLinkStart(stylename="Index_20_Link"))
         entry.addElement(IndexEntryChapter())
         entry.addElement(
-            IndexEntryTabStop(position=em(2.2 if level == 1 else 2.6), type="left")
+            IndexEntryTabStop(position=em(NUMBER_COLUMNS[level - 1]), type="left")
         )
         entry.addElement(IndexEntryText())
-        entry.addElement(IndexEntryTabStop(type="right", leaderchar=" "))
+        entry.addElement(IndexEntryTabStop(type="right", leaderchar="."))
         entry.addElement(IndexEntryPageNumber())
+        entry.addElement(IndexEntryLinkEnd())
         source.addElement(entry)
     extra = IndexSourceStyles(outlinelevel="1")
     for name in ("Titulo_20_sin_20_numero", "Anexo"):
@@ -956,9 +1018,10 @@ def build_report_pages(doc, page_layout, page_footer) -> None:
         title_template = IndexTitleTemplate(stylename="Titulo_20_de_20_indice")
         title_template.addText(title)
         source.addElement(title_template)
+        # ODF has no links in these entry templates, unlike the contents.
         entry = entry_cls(stylename=entry_style)
         entry.addElement(IndexEntryText())
-        entry.addElement(IndexEntryTabStop(type="right", leaderchar=" "))
+        entry.addElement(IndexEntryTabStop(type="right", leaderchar="."))
         entry.addElement(IndexEntryPageNumber())
         source.addElement(entry)
         index.addElement(source)
